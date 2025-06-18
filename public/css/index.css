@@ -1,0 +1,84 @@
+  body {
+    margin: 0;
+    font-family: "Sarabun", sans-serif;
+    background-color: #8bb57b;
+    /* สีพื้นหลังเขียว */
+  }
+
+  header {
+    text-align: right;
+    margin: 10px;
+
+    .top-buttons-information {
+      color: black;
+      border: none;
+      outline: none;
+      border-radius: 40px;
+      width: 100px;
+      height: 40px;
+    }
+
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 20px auto;
+    padding: 10px;
+    background-color: #8bb57b;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.sidebar {
+    width: 300px;
+    background-color: #c5e2a1;
+    border-radius: 15px;
+    padding: 30px;
+    gap: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-box {
+    background-color: #e4f2bc;
+    padding: 10px 15px;
+    font-size: 14px;
+    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+.info-box-person {
+    display: flex;
+    flex-direction: row;
+}
+
+/* เขียนสำหรับ #map */
+#map {
+    flex: 1;         /* กินพื้นที่ที่เหลือใน container */
+    min-height: 600px; /* กำหนดความสูงขั้นต่ำ */
+    border-radius: 15px;
+    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+    .selectors {
+     .checkbox-group{
+      display: flex;
+      flex-direction: column;
+     }
+
+    }
+    .legend {
+      background: white;
+      padding: 6px 10px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }

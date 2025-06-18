@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="/css/index.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+</head>
+//
+
+<body>
+    <header>
+        <div class="top-buttons">
+            <button class="top-buttons-information">จัดการข้อมูล</button>
+            <button class="top-buttons-information">ออก</button>
+        </div>
+    </header>
+
+
+    <div class="container">
+
+        <div class="sidebar">
+
+
+            <div class="info-box">
+                <div class="info-box-allperson">ประชากรทั้งหมด</div>
+                <div class="info-box-person">จำนวนการเฝ้าระวัง</div>
+                <div class="info-box-person">
+                    <p> จำนวนการเฝ้าระวังสูง
+                        <br>จำนวนการเฝ้าระวังกลาง
+                        <br>จำนวนการเฝ้าระวังต่ำ
+                    </p>
+                </div>
+            </div>
+
+
+
+            <form class="selectors" id="filterForm">
+                <label for="date" class="all-label">วัน</label>
+                <select id="date" name="date">
+                    <option>วัน</option>
+                    <option>1</option>
+                    <option>2</option>
+                    <option>3</option>
+
+                </select>
+
+                <label for="month" class="all-label">เดือน</label>
+                <select id="month" name="month">
+                    <option>เดือน</option>
+                    <option>มกราคม</option>
+                    <option>กุมภาพันธ์</option>
+                    <option>มีนาคม</option>
+
+                </select>
+
+                <label for="year" class="all-label">ปี</label>
+                <select id="year" name="year">
+                    <option>ปี</option>
+                    <option>2566</option>
+                    <option>2565</option>
+                    <option>2564</option>
+
+                </select>
+
+                <label for="amphoe" class="all-label">อำเภอ</label>
+                <select id="amphoe" name="amphoe">
+                    <option>อำเภอ</option>
+                    <option>เมือง</option>
+                    <option>แม่สาย</option>
+                    <option>เชียงของ</option>
+
+                </select>
+
+                <label for="tambon" class="all-label">ตำบล</label>
+                <select id="tambon" name="tambon">
+                    <option>ตำบล</option>
+                    <option>บ้านตุ่น</option>
+                    <option>เวียง</option>
+                    >
+                </select>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>รายได้</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="income" /> ไม่บรรลุนิติ</label>
+                        <label><input type="checkbox" name="income" /> น้อยมาก</label>
+                        <label><input type="checkbox" name="income" /> น้อย</label>
+                        <label><input type="checkbox" name="income" /> ปานกลาง</label>
+                        <label><input type="checkbox" name="income" /> ปานกลางค่อนข้างสูง</label>
+                        <label><input type="checkbox" name="income" /> สูง</label>
+                        <label><input type="checkbox" name="income" /> สูงมาก</label>
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>อายุ</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="income" /> ผู้สูงอายุ</label>
+                        <label><input type="checkbox" name="income" /> ผู้ใหญ่ตอนกลาง</label>
+                        <label><input type="checkbox" name="income" /> วัยรุ่น</label>
+                        <label><input type="checkbox" name="income" /> เด็ก</label>
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>เพศ</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="gender" /> ชาย</label>
+                        <label><input type="checkbox" name="gender" /> หญิง</label>
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>ฤดู</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" /> ร้อน</label>
+                        <label><input type="checkbox" /> หนาว</label>
+                        <label><input type="checkbox" /> ฝน</label>
+                    </div>
+                </div>
+                <button type="submit">submit</button>
+            </form>
+
+            <button>แผนที่</button>
+            <button>กราฟ</button>
+            <button>ข้อมูล</button>
+        </div>
+
+        <div id="map"></div>
+
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+    const map = L.map('map').setView([19.9, 99.8], 9);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // normalize function: trim space และ invisible char
+    function normalizeName(name) {
+        return name ? name.trim() : '';
+    }
+
+    async function loadInitialData() {
+        const res = await fetch('http://localhost:3000/map-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const data = await res.json();
+        console.log('Initial load:', data);
+
+        drawGeoLayer(data);
+    }
+
+    document.getElementById('filterForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const incomeLevels = [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value);
+        const genders = [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value);
+
+        const res = await fetch('http://localhost:3000/map-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ incomeLevels, genders })
+        });
+
+        const data = await res.json();
+        console.log('Filter submit:', data);
+
+        drawGeoLayer(data);
+    });
+
+    function drawGeoLayer(data) {
+        if (window.geoLayer) {
+            map.removeLayer(window.geoLayer);
+        }
+
+        console.log('District keys:', Object.keys(data.riskByDistrict));
+
+        window.geoLayer = L.geoJSON(data.geojson, {
+            style: feature => {
+                const district = normalizeName(feature.properties.amp_th);
+                const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
+                console.log(`District: ${district}, Risk: ${risk}`);
+
+                return {
+                    fillColor: getColor(risk),
+                    weight: 1,
+                    color: 'white',
+                    fillOpacity: 0.7
+                };
+            },
+            onEachFeature: (feature, layer) => {
+                const district = normalizeName(feature.properties.amp_th);
+                const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
+
+                layer.bindPopup(`<b>อำเภอ:</b> ${district}<br><b>ระดับ:</b> ${risk}`);
+            }
+        }).addTo(map);
+    }
+
+    function getColor(risk) {
+        if (risk === 'เฝ้าระวังสูง') return '#e74c3c';
+        if (risk === 'เฝ้าระวังกลาง') return '#f39c12';
+        if (risk === 'เฝ้าระวังต่ำ') return '#16a085';
+        return '#bdc3c7';
+    }
+
+    // โหลดรอบแรก
+    loadInitialData();
+</script>
+
+    </div>
+
+</body>
+
+</html>

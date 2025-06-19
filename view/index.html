@@ -7,9 +7,9 @@
     <title>Document</title>
     <link rel="stylesheet" href="/css/index.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.js"></script>
 </head>
-//
 
 <body>
     <header>
@@ -86,40 +86,40 @@
                 <div style="width: 100%; margin-top: 10px;">
                     <b>รายได้</b>
                     <div class="checkbox-group">
-                        <label><input type="checkbox" name="income" /> ไม่บรรลุนิติ</label>
-                        <label><input type="checkbox" name="income" /> น้อยมาก</label>
-                        <label><input type="checkbox" name="income" /> น้อย</label>
-                        <label><input type="checkbox" name="income" /> ปานกลาง</label>
-                        <label><input type="checkbox" name="income" /> ปานกลางค่อนข้างสูง</label>
-                        <label><input type="checkbox" name="income" /> สูง</label>
-                        <label><input type="checkbox" name="income" /> สูงมาก</label>
+                        <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อย" /> น้อย</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลางค่อนข้างสูง" />ปานกลางค่อนข้างสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
+                        <label><input type="checkbox" name="income" value="ไม่ระบุ" />ไม่ระบุ</label>
                     </div>
                 </div>
 
                 <div style="width: 100%; margin-top: 10px;">
                     <b>อายุ</b>
                     <div class="checkbox-group">
-                        <label><input type="checkbox" name="income" /> ผู้สูงอายุ</label>
-                        <label><input type="checkbox" name="income" /> ผู้ใหญ่ตอนกลาง</label>
-                        <label><input type="checkbox" name="income" /> วัยรุ่น</label>
-                        <label><input type="checkbox" name="income" /> เด็ก</label>
+                        <label><input type="checkbox" name="ageGroups" value="ผู้สูงอายุ" /> ผู้สูงอายุ</label>
+                        <label><input type="checkbox" name="ageGroups" value="ผู้ใหญ่ตอนกลาง" /> ผู้ใหญ่ตอนกลาง</label>
+                        <label><input type="checkbox" name="ageGroups" value="วัยรุ่น" /> วัยรุ่น</label>
+                        <label><input type="checkbox" name="ageGroups" value="เด็ก" /> เด็ก</label>
                     </div>
                 </div>
 
                 <div style="width: 100%; margin-top: 10px;">
                     <b>เพศ</b>
                     <div class="checkbox-group">
-                        <label><input type="checkbox" name="gender" /> ชาย</label>
-                        <label><input type="checkbox" name="gender" /> หญิง</label>
+                        <label><input type="checkbox" name="gender" value="ชาย" /> ชาย</label>
+                        <label><input type="checkbox" name="gender" value="หญิง" /> หญิง</label>
                     </div>
                 </div>
 
                 <div style="width: 100%; margin-top: 10px;">
                     <b>ฤดู</b>
                     <div class="checkbox-group">
-                        <label><input type="checkbox" /> ร้อน</label>
-                        <label><input type="checkbox" /> หนาว</label>
-                        <label><input type="checkbox" /> ฝน</label>
+                        <label><input type="checkbox" name="season"value="ฤดูร้อน"/> ฤดูร้อน</label>
+                        <label><input type="checkbox" name="season"value="ฤดูหนาว"/> ฤดูหนาว</label>
+                        <label><input type="checkbox" name="season"value="ฤดูฝน"/> ฤดูฝน</label>
                     </div>
                 </div>
                 <button type="submit">submit</button>
@@ -133,88 +133,107 @@
         <div id="map"></div>
 
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-    const map = L.map('map').setView([19.9, 99.8], 9);
+        <script>
+            const map = L.map('map').setView([19.9, 99.8], 9);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
 
-    // normalize function: trim space และ invisible char
-    function normalizeName(name) {
-        return name ? name.trim() : '';
-    }
-
-    async function loadInitialData() {
-        const res = await fetch('http://localhost:3000/map-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-
-        const data = await res.json();
-        console.log('Initial load:', data);
-
-        drawGeoLayer(data);
-    }
-
-    document.getElementById('filterForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const incomeLevels = [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value);
-        const genders = [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value);
-
-        const res = await fetch('http://localhost:3000/map-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ incomeLevels, genders })
-        });
-
-        const data = await res.json();
-        console.log('Filter submit:', data);
-
-        drawGeoLayer(data);
-    });
-
-    function drawGeoLayer(data) {
-        if (window.geoLayer) {
-            map.removeLayer(window.geoLayer);
-        }
-
-        console.log('District keys:', Object.keys(data.riskByDistrict));
-
-        window.geoLayer = L.geoJSON(data.geojson, {
-            style: feature => {
-                const district = normalizeName(feature.properties.amp_th);
-                const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
-                console.log(`District: ${district}, Risk: ${risk}`);
-
-                return {
-                    fillColor: getColor(risk),
-                    weight: 1,
-                    color: 'white',
-                    fillOpacity: 0.7
-                };
-            },
-            onEachFeature: (feature, layer) => {
-                const district = normalizeName(feature.properties.amp_th);
-                const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
-
-                layer.bindPopup(`<b>อำเภอ:</b> ${district}<br><b>ระดับ:</b> ${risk}`);
+            // normalize function: trim space และ invisible char
+            function normalizeName(name) {
+                return name ? name.trim() : '';
             }
-        }).addTo(map);
-    }
+            const legend = L.control({ position: 'bottomleft' });
 
-    function getColor(risk) {
-        if (risk === 'เฝ้าระวังสูง') return '#e74c3c';
-        if (risk === 'เฝ้าระวังกลาง') return '#f39c12';
-        if (risk === 'เฝ้าระวังต่ำ') return '#16a085';
-        return '#bdc3c7';
-    }
+            legend.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'legend');
+                div.innerHTML = `
+                <b>ระดับความเสี่ยง</b><br>
+                <i style="background:#e74c3c"></i> เฝ้าระวังสูง<br>
+                <i style="background:#f39c12"></i> เฝ้าระวังกลาง<br>
+                <i style="background:#16a085"></i> เฝ้าระวังต่ำ<br>
+                <i style="background:#bdc3c7"></i> ไม่ระบุ<br>
+                                                            `;
+                return div;
+            };
+            legend.addTo(map);
 
-    // โหลดรอบแรก
-    loadInitialData();
-</script>
+
+            async function loadInitialData() {
+                const res = await fetch('http://localhost:3000/map-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await res.json();
+                console.log('Initial load:', data);
+
+                drawGeoLayer(data);
+            }
+
+            document.getElementById('filterForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const incomeLevels = [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value);
+                const genders = [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value);
+                const ageGroups = [...document.querySelectorAll('input[name="ageGroups"]:checked')].map(cb => cb.value);
+                const seasons = [...document.querySelectorAll('input[name="season"]:checked')].map(cb => cb.value);
+
+                const res = await fetch('http://localhost:3000/map-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ incomeLevels, genders,ageGroups,seasons})
+                });
+
+                const data = await res.json();
+                console.log('Filter submit:', data);
+
+                drawGeoLayer(data);
+            });
+
+            function drawGeoLayer(data) {
+                if (window.geoLayer) {
+                    map.removeLayer(window.geoLayer);
+                }
+
+                console.log('District keys:', Object.keys(data.riskByDistrict));
+
+                window.geoLayer = L.geoJSON(data.geojson, {
+                    style: feature => {
+                        const district = normalizeName(feature.properties.amp_th);
+                        const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
+                        console.log(`District: ${district}, Risk: ${risk}`);
+
+                        return {
+                            fillColor: getColor(risk),
+                            weight: 1,
+                            color: 'white',
+                            fillOpacity: 0.7
+                        };
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const district = normalizeName(feature.properties.amp_th);
+                        const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
+
+                        layer.bindPopup(`<b>อำเภอ:</b> ${district}<br><b>ระดับ:</b> ${risk}`);
+                    }
+                }).addTo(map);
+            }
+
+
+            function getColor(risk) {
+                if (risk === 'เฝ้าระวังสูง') return '#e74c3c';
+                if (risk === 'เฝ้าระวังกลาง') return '#f39c12';
+                if (risk === 'เฝ้าระวังต่ำ') return '#16a085';
+                return '#bdc3c7';
+            }
+
+
+            // โหลดรอบแรก
+            loadInitialData();
+        </script>
 
     </div>
 

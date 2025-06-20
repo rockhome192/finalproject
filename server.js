@@ -10,11 +10,7 @@ const fs = require('fs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({
-  origin: 'http://127.0.0.1:5500',
-  methods: ['GET', 'POST'],
-  credentials: true // ถ้ามีการใช้ cookie ด้วย
-}));
+
 const con = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -149,23 +145,29 @@ app.post('/map-data', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const riskByDistrict = {};
+    let total_high = 0;
+    let total_medium = 0;
+    let total_low = 0;
 
     // 👉 แปลงผล SQL -> riskByDistrict
-  rows.forEach(row => {
-  const low = Number(row.count_low);
-  const medium = Number(row.count_medium);
-  const high = Number(row.count_high);
+    rows.forEach(row => {
+      const low = Number(row.count_low);
+      const medium = Number(row.count_medium);
+      const high = Number(row.count_high);
+      total_low += low;
+      total_medium += medium;
+      total_high += high;
+      const max = Math.max(low, medium, high);
 
-  const max = Math.max(low, medium, high);
+      let risk = 'ไม่ระบุ';
 
-  let risk = 'ไม่ระบุ';
+      if (max === high) risk = 'เฝ้าระวังสูง';
+      else if (max === medium) risk = 'เฝ้าระวังกลาง';
+      else if (max === low) risk = 'เฝ้าระวังต่ำ';
 
-  if (max === high) risk = 'เฝ้าระวังสูง';
-  else if (max === medium) risk = 'เฝ้าระวังกลาง';
-  else if (max === low) risk = 'เฝ้าระวังต่ำ';
+      riskByDistrict[row.district_name.trim()] = risk;  // trim() เผื่อช่องว่าง
+    });
 
-  riskByDistrict[row.district_name.trim()] = risk;  // trim() เผื่อช่องว่าง
-});
 
 
     console.log('SQL result rows:', rows);
@@ -188,7 +190,12 @@ app.post('/map-data', (req, res) => {
       // ✅ ส่ง response
       res.json({
         geojson,
-        riskByDistrict
+        riskByDistrict,
+        total: {
+          high: total_high,
+          medium: total_medium,
+          low: total_low
+        }
       });
     });
   });

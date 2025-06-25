@@ -41,44 +41,35 @@
                 <label for="date" class="all-label">วัน</label>
                 <select id="date" name="date">
                     <option>วัน</option>
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
+
 
                 </select>
 
                 <label for="month" class="all-label">เดือน</label>
                 <select id="month" name="month">
                     <option>เดือน</option>
-                    <option>มกราคม</option>
-                    <option>กุมภาพันธ์</option>
-                    <option>มีนาคม</option>
+
 
                 </select>
 
                 <label for="year" class="all-label">ปี</label>
                 <select id="year" name="year">
                     <option>ปี</option>
-                    <option>2566</option>
-                    <option>2565</option>
-                    <option>2564</option>
+
 
                 </select>
 
                 <label for="amphoe" class="all-label">อำเภอ</label>
-                <select id="amphoe" name="amphoe">
+                <select id="district" name="district">
                     <option>อำเภอ</option>
-                    <option>เมือง</option>
-                    <option>แม่สาย</option>
-                    <option>เชียงของ</option>
+
 
                 </select>
 
                 <label for="tambon" class="all-label">ตำบล</label>
-                <select id="tambon" name="tambon">
+                <select id="subdistrict" name="subdistrict">
                     <option>ตำบล</option>
-                    <option>บ้านตุ่น</option>
-                    <option>เวียง</option>
+
                     >
                 </select>
 
@@ -146,20 +137,47 @@
             function normalizeName(name) {
                 return name ? name.trim() : '';
             }
+            let currentLevel = 'district';
+            let currentDistrict = null;
+            const levelControl = L.control({ position: 'topright' });
+
+            levelControl.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'level-control');
+                div.style.background = 'white';
+                div.style.padding = '6px';
+                div.style.borderRadius = '4px';
+                div.style.cursor = 'pointer';
+                div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+                div.innerHTML = '<b>ระดับ: อำเภอ</b>';
+
+                div.onclick = function () {
+                    if (currentLevel === 'subdistrict') {
+                        // กลับไปอำเภอ
+                        loadInitialData();
+                    }
+                };
+
+                return div;
+            };
+
+            
+
             const legend = L.control({ position: 'bottomleft' });
 
             legend.onAdd = function (map) {
-                const div = L.DomUtil.create('div', 'legend');
-                div.innerHTML = `
+
+                const detail = L.DomUtil.create('detail', 'legend');
+                detail.innerHTML = `
                 <b>ระดับความเสี่ยง</b><br>
                 <i style="background:#e74c3c"></i> เฝ้าระวังสูง<br>
                 <i style="background:#f39c12"></i> เฝ้าระวังกลาง<br>
                 <i style="background:#16a085"></i> เฝ้าระวังต่ำ<br>
                 <i style="background:#bdc3c7"></i> ไม่ระบุ<br>
                                                             `;
-                return div;
+                return detail;
             };
             legend.addTo(map);
+            levelControl.addTo(map);
 
 
             async function loadInitialData() {
@@ -172,35 +190,46 @@
                 const data = await res.json();
                 console.log('Initial load:', data);
 
+                currentLevel = 'district';
+                currentDistrict = null;
+                levelControl.getContainer().innerHTML = '<b>ระดับ: อำเภอ</b>';
+
                 drawGeoLayer(data);
             }
+
             // ดึง checkbox ทุกตัวที่มีชื่อ income, gender, ageGroups, season
             const filterInputs = document.querySelectorAll('input[name="income"], input[name="gender"], input[name="ageGroups"], input[name="season"]');
 
             async function updateMap() {
+                const payload = {};
+
                 const incomeLevels = [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value);
                 const genders = [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value);
                 const ageGroups = [...document.querySelectorAll('input[name="ageGroups"]:checked')].map(cb => cb.value);
                 const seasons = [...document.querySelectorAll('input[name="season"]:checked')].map(cb => cb.value);
 
+                payload.incomeLevels = incomeLevels;
+                payload.genders = genders;
+                payload.ageGroups = ageGroups;
+                payload.seasons = seasons;
 
                 const res = await fetch('http://localhost:3000/map-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ incomeLevels, genders, ageGroups, seasons })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await res.json();
                 console.log('Filter changed:', data);
 
                 drawGeoLayer(data);
-
             }
 
-            // เพิ่ม event change ให้ checkbox ทุกตัว
+            // เพิ่ม event change ให้ checkbox + select
             filterInputs.forEach(input => {
                 input.addEventListener('change', updateMap);
             });
+
 
 
             function drawGeoLayer(data) {
@@ -227,12 +256,74 @@
                         const district = normalizeName(feature.properties.amp_th);
                         const risk = data.riskByDistrict[district] || 'ไม่ระบุ';
 
-                        layer.bindPopup(`<b>อำเภอ:</b> ${district}<br><b>ระดับ:</b> ${risk}`);
+                        layer.bindPopup(`<b>อำเภอ:</b> ${district}<br><b>ระดับ:</b> ${risk}<br>`);
+                        layer.on('mouseover', function (e) {
+                            this.openPopup();
+                            // เพิ่ม cursor pointer ถ้าชอบ
+                            this._path.style.cursor = 'pointer';
+                        });
+                        // หรือ ถ้าไม่ใช้ปุ่ม ใช้ click ทั้ง layer เลย:
+                        layer.on('click', () => {
+                            currentLevel = 'subdistrict';
+                            currentDistrict = district;
+                            loadSubdistrict(district);
+
+                            const bounds = layer.getBounds();
+                            map.fitBounds(bounds); // Zoom เข้าไปอำเภอ
+                        });
+
+
+                        async function loadSubdistrict(districtName) {
+                            console.log('โหลดตำบลของ:', districtName);
+
+                            const res = await fetch(`http://localhost:3000/subdistrict-map-data`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ districtName })
+                            });
+
+                            const data = await res.json();
+
+                            if (window.geoLayer) {
+                                map.removeLayer(window.geoLayer);
+                            }
+
+                            window.geoLayer = L.geoJSON(data.features, {
+                                style: feature => {
+                                    const subdistrictName = normalizeName(feature.properties.tam_th);
+                                    const risk = data.riskBySubdistrict[subdistrictName] || 'ไม่ระบุ';
+
+                                    return {
+                                        fillColor: getColor(risk),
+                                        weight: 1,
+                                        color: 'white',
+                                        fillOpacity: 0.6
+                                    };
+                                },
+                                onEachFeature: (feature, layer) => {
+                                    const subdistrictName = normalizeName(feature.properties.tam_th);
+                                    const risk = data.riskBySubdistrict[subdistrictName] || 'ไม่ระบุ';
+
+                                    layer.bindPopup(`<b>ตำบล:</b> ${subdistrictName}<br><b>ระดับ:</b> ${risk}`);
+                                }
+                            }).addTo(map);
+
+                            const bounds = window.geoLayer.getBounds();
+                            map.fitBounds(bounds);
+
+                            currentLevel = 'subdistrict';
+                            currentDistrict = districtName;
+                            levelControl.getContainer().innerHTML = `<b>ระดับ: ตำบล (${districtName})</b>`;
+                        }
+
+
                     }
+
                 }).addTo(map);
                 document.getElementById('count-high').innerText = data.total.high;
                 document.getElementById('count-medium').innerText = data.total.medium;
                 document.getElementById('count-low').innerText = data.total.low;
+
             }
 
 

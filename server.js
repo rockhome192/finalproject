@@ -88,10 +88,15 @@ app.post('/register', (req, res) => {
     });
   });
 });
-//-------------------map-----------------
+//-------------------map--------------------------------------------------------------
 app.post('/map-data', (req, res) => {
   const {
     district_id,
+    date,
+    month,
+    year,
+    district,
+    subdistrict,
     incomeLevels,
     ageGroups,
     genders,
@@ -131,9 +136,9 @@ app.post('/map-data', (req, res) => {
   const sql = `
     SELECT 
       d.name_th AS district_name,
-      SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_low,
+      SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
       SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
-      SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_high
+      SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
     FROM person p
     JOIN district d ON p.district_id = d.id
     WHERE p.predict IS NOT NULL
@@ -157,6 +162,7 @@ app.post('/map-data', (req, res) => {
       total_low += low;
       total_medium += medium;
       total_high += high;
+  
       const max = Math.max(low, medium, high);
 
       let risk = 'ไม่ระบุ';
@@ -201,7 +207,102 @@ app.post('/map-data', (req, res) => {
   });
 });
 
+//--------------------------------------subdistrict-------------
+app.post('/subdistrict-map-data', (req, res) => {
+  const { districtName } = req.body;
+    const {
+    incomeLevels,
+    ageGroups,
+    genders,
+    seasons
+  } = req.body
+  const conditions = [];
+  const values = [];
 
+  if (incomeLevels && incomeLevels.length > 0) {
+    conditions.push(`p.monthly_income IN (${incomeLevels.map(() => '?').join(',')})`);
+    values.push(...incomeLevels);
+  }
+
+  if (ageGroups && ageGroups.length > 0) {
+    conditions.push(`p.age_range IN (${ageGroups.map(() => '?').join(',')})`);
+    values.push(...ageGroups);
+  }
+
+  if (genders && genders.length > 0) {
+    conditions.push(`p.gender IN (${genders.map(() => '?').join(',')})`);
+    values.push(...genders);
+  }
+
+  if (seasons && seasons.length > 0) {
+    conditions.push(`p.season IN (${seasons.map(() => '?').join(',')})`);
+    values.push(...seasons);
+  }
+
+  const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
+  
+
+  const sql = `
+    SELECT 
+      s.name_th AS sub_district_name,
+      SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
+      SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
+      SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
+    FROM person p
+    JOIN sub_district s ON p.subdistrict_id = s.id
+    JOIN district d ON p.district_id = d.id
+    WHERE d.name_th = ? AND p.predict IS NOT NULL
+     ${whereClause ? 'AND ' + whereClause : ''}
+    GROUP BY p.subdistrict_id;
+  `;
+
+  con.query(sql, [districtName], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const riskBySubdistrict = {};
+
+    rows.forEach(row => {
+      const low = Number(row.count_low);
+      const medium = Number(row.count_medium);
+      const high = Number(row.count_high);
+
+      const max = Math.max(low, medium, high);
+
+      let risk = 'ไม่ระบุ';
+
+      if (max === high) risk = 'เฝ้าระวังสูง';
+      else if (max === medium) risk = 'เฝ้าระวังกลาง';
+      else if (max === low) risk = 'เฝ้าระวังต่ำ';
+
+      riskBySubdistrict[row.sub_district_name.trim()] = risk;
+    });
+
+    
+    console.log('SQL result rows:', rows);
+    const geojsonPath = path.join(__dirname, 'data/chiangrai_subdistricts.geojson');
+    fs.readFile(geojsonPath, 'utf8', (geoErr, geoData) => {
+      if (geoErr) return res.status(500).json({ error: geoErr.message });
+
+      const geojson = JSON.parse(geoData);
+
+      // filter เฉพาะอำเภอที่เลือก
+      const filteredFeatures = geojson.features.filter(f => f.properties.amp_th.trim() === districtName.trim());
+
+      // เติม "ไม่ระบุ" ถ้าไม่มีใน riskBySubdistrict
+      filteredFeatures.forEach(feature => {
+        const subdistrictName = feature.properties.tam_th.trim();
+        if (!riskBySubdistrict[subdistrictName]) {
+          riskBySubdistrict[subdistrictName] = 'ไม่ระบุ';
+        }
+      });
+
+      res.json({
+        features: filteredFeatures,
+        riskBySubdistrict
+      });
+    });
+  });
+});
 
 
 app.listen(3000, () => {

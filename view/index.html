@@ -38,32 +38,28 @@
 
 
             <form class="selectors" id="filterForm">
-                <label for="date" class="all-label">วัน</label>
-                <select id="date" name="date">
-                    <option>วัน</option>
-
-
+                <label for="year" class="all-label">ปี</label>
+                <select id="year" name="year">
                 </select>
 
                 <label for="month" class="all-label">เดือน</label>
                 <select id="month" name="month">
-                    <option>เดือน</option>
-
-
+                 
                 </select>
 
-                <label for="year" class="all-label">ปี</label>
-                <select id="year" name="year">
-                    <option>ปี</option>
-
-
+                <label for="date" class="all-label">วัน</label>
+                <select id="date" name="date">
+                   
                 </select>
 
-                <label for="amphoe" class="all-label">อำเภอ</label>
+                <label for="district" class="all-label">อำเภอ</label>
                 <select id="district" name="district">
                     <option>อำเภอ</option>
+                </select>
 
-
+                <label for="subdistrict" class="all-label">ตำบล</label>
+                <select id="subdistrict" name="subdistrict">
+                    <option>ตำบล</option>
                 </select>
 
                 <label for="tambon" class="all-label">ตำบล</label>
@@ -124,11 +120,9 @@
         <div id="map"></div>
 
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
         <script>
-
-
             const map = L.map('map').setView([19.9, 99.8], 9);
-
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
@@ -160,7 +154,7 @@
                 return div;
             };
 
-            
+
 
             const legend = L.control({ position: 'bottomleft' });
 
@@ -178,8 +172,33 @@
             };
             legend.addTo(map);
             levelControl.addTo(map);
+//-----------------------------------------------------select---------------------------------------
+  async function loadYearOptions() {
+      try {
+          const res = await fetch('http://localhost:3000/api/options/year');
+          const years = await res.json();
+          const select = document.getElementById('year');
+       select.innerHTML = '<option value="">ปี</option>';
+          years.forEach(year => {
+              const option = document.createElement('option');
+              option.value = year;
+              option.textContent = year;
+              select.appendChild(option);
+          });
+      } catch (err) {
+          console.error('โหลดปีไม่สำเร็จ:', err);
+      }
+  }
 
 
+
+  window.addEventListener('DOMContentLoaded', () => {
+      loadYearOptions();
+      loadMonthOptions();
+
+  });
+
+//----------------------------------------------load map -------------------------------------------------------
             async function loadInitialData() {
                 const res = await fetch('http://localhost:3000/map-data', {
                     method: 'POST',
@@ -197,7 +216,7 @@
                 drawGeoLayer(data);
             }
 
-            // ดึง checkbox ทุกตัวที่มีชื่อ income, gender, ageGroups, season
+//------------------------------------------------check box--------------------------------------------------------------------
             const filterInputs = document.querySelectorAll('input[name="income"], input[name="gender"], input[name="ageGroups"], input[name="season"]');
 
             async function updateMap() {
@@ -224,7 +243,20 @@
 
                 drawGeoLayer(data);
             }
+            document.getElementById('district').addEventListener('change', async (e) => {
+                const districtName = e.target.value;
+                const res = await fetch(`http://localhost:3000/api/options/subdistrict?districtName=${encodeURIComponent(districtName)}`);
+                const data = await res.json();
+                const select = document.getElementById('subdistrict');
 
+                select.innerHTML = `<option value="">ตำบล</option>`;
+                data.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    select.appendChild(option);
+                });
+            });
             // เพิ่ม event change ให้ checkbox + select
             filterInputs.forEach(input => {
                 input.addEventListener('change', updateMap);

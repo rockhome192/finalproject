@@ -303,7 +303,60 @@ app.post('/subdistrict-map-data', (req, res) => {
     });
   });
 });
+//------------------------------------------SELECT-------------------------------------------------------------
+app.get('/api/options/month', (req, res) => {
+  const sql = `
+    SELECT DISTINCT MONTH(birth_date) AS month
+    FROM person
+    WHERE birth_date IS NOT NULL
+    ORDER BY month ASC
+  `;
+  con.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const months = rows.map(row => row.year);
+    res.json(months);
+  });
+});
 
+app.get('/api/options/year', (req, res) => {
+  const sql = `
+    SELECT DISTINCT YEAR(birth_date) AS year
+    FROM person
+    WHERE birth_date IS NOT NULL
+    ORDER BY year DESC
+  `;
+  
+  con.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const years = rows.map(row => row.year);
+    res.json(years); // ✅ ต้องเป็น JSON
+  });
+});
+
+app.get('/api/options/district', (req, res) => {
+  const sql = `SELECT DISTINCT d.name_th FROM district d JOIN person p ON p.district_id = d.id ORDER BY d.name_th`;
+  con.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const districts = rows.map(r => r.name_th);
+    res.json(districts);
+  });
+});
+app.get('/api/options/subdistrict', (req, res) => {
+  const { districtName } = req.query;
+  const sql = `
+    SELECT DISTINCT s.name_th FROM subdistrict s
+    JOIN district d ON s.district_id = d.id
+    JOIN person p ON p.subdistrict_id = s.id
+    WHERE d.name_th = ?
+    ORDER BY s.name_th
+  `;
+  con.query(sql, [districtName], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const subdistricts = rows.map(r => r.name_th);
+    res.json(subdistricts);
+  });
+});
 
 app.listen(3000, () => {
   console.log("Server is running : 3000")

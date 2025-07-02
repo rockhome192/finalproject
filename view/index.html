@@ -26,11 +26,9 @@
 
 
             <div class="info-box">
-                <div class="info-box-person">จำนวนการเฝ้าระวัง</div>
                 <div class="info-box-person">
-                    <p> จำนวนการเฝ้าระวังสูง <span id="count-high"></span>
-                        <br>จำนวนการเฝ้าระวังกลาง<span id="count-medium"></span>
-                        <br>จำนวนการเฝ้าระวังต่ำ<span id="count-low"></span>
+                    <p id="summary">กำลังโหลดข้อมูล...</p> 
+                    <h3>จำนวนเหตุ<br><strong id="total-events">-</strong></h3>
                     </p>
                 </div>
             </div>
@@ -44,12 +42,12 @@
 
                 <label for="month" class="all-label">เดือน</label>
                 <select id="month" name="month">
-                 
+
                 </select>
 
                 <label for="date" class="all-label">วัน</label>
                 <select id="date" name="date">
-                   
+
                 </select>
 
                 <label for="district" class="all-label">อำเภอ</label>
@@ -62,12 +60,7 @@
                     <option>ตำบล</option>
                 </select>
 
-                <label for="tambon" class="all-label">ตำบล</label>
-                <select id="subdistrict" name="subdistrict">
-                    <option>ตำบล</option>
-
-                    >
-                </select>
+           
 
                 <div style="width: 100%; margin-top: 10px;">
                     <b>รายได้</b>
@@ -172,33 +165,48 @@
             };
             legend.addTo(map);
             levelControl.addTo(map);
-//-----------------------------------------------------select---------------------------------------
-  async function loadYearOptions() {
-      try {
-          const res = await fetch('http://localhost:3000/api/options/year');
-          const years = await res.json();
-          const select = document.getElementById('year');
-       select.innerHTML = '<option value="">ปี</option>';
-          years.forEach(year => {
-              const option = document.createElement('option');
-              option.value = year;
-              option.textContent = year;
-              select.appendChild(option);
-          });
-      } catch (err) {
-          console.error('โหลดปีไม่สำเร็จ:', err);
-      }
-  }
+            //-----------------------------------------------------select---------------------------------------
+            async function loadYearOptions() {
+                try {
+                    const res = await fetch('http://localhost:3000/api/options/year');
+                    const years = await res.json();
+                    const select = document.getElementById('year');
+                    select.innerHTML = '<option value="">ปี</option>';
+                    years.forEach(year => {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = year;
+                        select.appendChild(option);
+                    });
+                } catch (err) {
+                    console.error('โหลดปีไม่สำเร็จ:', err);
+                }
+            }
+            async function loadMonthOptions() {
+                try {
+                    const res = await fetch('http://localhost:3000/api/options/month');
+                    const months = await res.json();
+                    const select = document.getElementById('month');
+                    select.innerHTML = '<option value="">เดือน</option>';
+                    months.forEach(month => {
+                        const option = document.createElement('option');
+                        option.value = month;
+                        option.textContent = month;
+                        select.appendChild(option);
+                    });
+                } catch (err) {
+                    console.error('โหลดเดือนไม่สำเร็จ:', err);
+                }
+            }
 
 
+            window.addEventListener('DOMContentLoaded', () => {
+                loadYearOptions();
+                loadMonthOptions();
 
-  window.addEventListener('DOMContentLoaded', () => {
-      loadYearOptions();
-      loadMonthOptions();
+            });
 
-  });
-
-//----------------------------------------------load map -------------------------------------------------------
+            //----------------------------------------------load map -------------------------------------------------------
             async function loadInitialData() {
                 const res = await fetch('http://localhost:3000/map-data', {
                     method: 'POST',
@@ -216,7 +224,7 @@
                 drawGeoLayer(data);
             }
 
-//------------------------------------------------check box--------------------------------------------------------------------
+            //------------------------------------------------check box--------------------------------------------------------------------
             const filterInputs = document.querySelectorAll('input[name="income"], input[name="gender"], input[name="ageGroups"], input[name="season"]');
 
             async function updateMap() {
@@ -352,13 +360,14 @@
                     }
 
                 }).addTo(map);
-                document.getElementById('count-high').innerText = data.total.high;
-                document.getElementById('count-medium').innerText = data.total.medium;
-                document.getElementById('count-low').innerText = data.total.low;
+                // Update sidebar summary
+                document.getElementById('summary').innerText = `เฝ้าระวังต่ำ ${data.total.low}
+เฝ้าระวังปานกลาง ${data.total.medium}
+เฝ้าระวังสูง ${data.total.high}`;
+                document.getElementById('total-events').innerText =
+                    data.total.low + data.total.medium + data.total.high;
 
             }
-
-
             function getColor(risk) {
                 if (risk === 'เฝ้าระวังสูง') return '#e74c3c';
                 if (risk === 'เฝ้าระวังกลาง') return '#f39c12';

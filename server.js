@@ -91,16 +91,16 @@ app.post('/register', (req, res) => {
 //-------------------map--------------------------------------------------------------
 app.post('/map-data', (req, res) => {
   const {
-    district_id,
-    date,
-    month,
     year,
-    district,
-    subdistrict,
+    month,
+    date,
+    district_id,
     incomeLevels,
     ageGroups,
     genders,
-    seasons
+    seasons,
+    district,
+    subdistrict
   } = req.body;
 
   const conditions = [];
@@ -130,39 +130,68 @@ app.post('/map-data', (req, res) => {
     conditions.push(`p.season IN (${seasons.map(() => '?').join(',')})`);
     values.push(...seasons);
   }
+  if (year) {
+    conditions.push(`YEAR(p.birth_date) = ?`);
+    values.push(year);
+  }
+
+  if (month) {
+    conditions.push(`MONTH(p.birth_date) = ?`);
+    values.push(month);
+  }
+
+  if (date) {
+    conditions.push(`DAY(p.birth_date) = ?`);
+    values.push(date);
+  }
+if (district && district !== 'none' && district !== 'อำเภอ') {
+  conditions.push('d.name_th = ?');
+  values.push(district);
+}
+
+if (subdistrict && subdistrict !== 'none' && subdistrict !== 'ตำบล') {
+  conditions.push('s.name_th = ?');
+  values.push(subdistrict);
+}
+
 
   const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
 
-  const sql = `
-    SELECT 
-      d.name_th AS district_name,
-      SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
-      SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
-      SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
-    FROM person p
-    JOIN district d ON p.district_id = d.id
-    WHERE p.predict IS NOT NULL
-    ${whereClause ? 'AND ' + whereClause : ''}
-    GROUP BY p.district_id;
-  `;
+const sql = `
+  SELECT 
+    d.name_th AS district_name,
+    SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
+    SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
+    SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
+  FROM person p
+  JOIN district d ON p.district_id = d.id
+  JOIN sub_district s ON p.subdistrict_id = s.id
+  WHERE p.predict IS NOT NULL
+  ${whereClause ? 'AND ' + whereClause : ''}
+  GROUP BY p.district_id;
+`;
+
 
   con.query(sql, values, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const riskByDistrict = {};
+    const districtStats = {};
     let total_high = 0;
     let total_medium = 0;
     let total_low = 0;
 
     // 👉 แปลงผล SQL -> riskByDistrict
     rows.forEach(row => {
+      const districtName = row.district_name.trim();
       const low = Number(row.count_low);
       const medium = Number(row.count_medium);
       const high = Number(row.count_high);
+      districtStats[districtName] = { low, medium, high };
       total_low += low;
       total_medium += medium;
       total_high += high;
-  
+
       const max = Math.max(low, medium, high);
 
       let risk = 'ไม่ระบุ';
@@ -170,13 +199,15 @@ app.post('/map-data', (req, res) => {
       if (max === high) risk = 'เฝ้าระวังสูง';
       else if (max === medium) risk = 'เฝ้าระวังกลาง';
       else if (max === low) risk = 'เฝ้าระวังต่ำ';
-
-      riskByDistrict[row.district_name.trim()] = risk;  // trim() เผื่อช่องว่าง
+      riskByDistrict[districtName] = risk;
+      // trim() เผื่อช่องว่าง
     });
 
 
 
     console.log('SQL result rows:', rows);
+    console.log("SQL query:", sql);
+    console.log("SQL values:", values);
 
     // ✅ โหลด geojson
     const geojsonPath = path.join(__dirname, 'data/chiangrai_districts.geojson');
@@ -197,6 +228,7 @@ app.post('/map-data', (req, res) => {
       res.json({
         geojson,
         riskByDistrict,
+        districtStats,
         total: {
           high: total_high,
           medium: total_medium,
@@ -210,7 +242,7 @@ app.post('/map-data', (req, res) => {
 //--------------------------------------subdistrict-------------
 app.post('/subdistrict-map-data', (req, res) => {
   const { districtName } = req.body;
-    const {
+  const {
     incomeLevels,
     ageGroups,
     genders,
@@ -240,7 +272,7 @@ app.post('/subdistrict-map-data', (req, res) => {
   }
 
   const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
-  
+
 
   const sql = `
     SELECT 
@@ -260,7 +292,7 @@ app.post('/subdistrict-map-data', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const riskBySubdistrict = {};
-
+    const subdistrictStats = {};
     rows.forEach(row => {
       const low = Number(row.count_low);
       const medium = Number(row.count_medium);
@@ -269,15 +301,16 @@ app.post('/subdistrict-map-data', (req, res) => {
       const max = Math.max(low, medium, high);
 
       let risk = 'ไม่ระบุ';
-
       if (max === high) risk = 'เฝ้าระวังสูง';
       else if (max === medium) risk = 'เฝ้าระวังกลาง';
       else if (max === low) risk = 'เฝ้าระวังต่ำ';
 
-      riskBySubdistrict[row.sub_district_name.trim()] = risk;
+      const name = row.sub_district_name.trim();
+      riskBySubdistrict[name] = risk;
+      subdistrictStats[name] = { low, medium, high };
     });
 
-    
+
     console.log('SQL result rows:', rows);
     const geojsonPath = path.join(__dirname, 'data/chiangrai_subdistricts.geojson');
     fs.readFile(geojsonPath, 'utf8', (geoErr, geoData) => {
@@ -298,7 +331,8 @@ app.post('/subdistrict-map-data', (req, res) => {
 
       res.json({
         features: filteredFeatures,
-        riskBySubdistrict
+        riskBySubdistrict,
+        subdistrictStats
       });
     });
   });
@@ -313,11 +347,11 @@ app.get('/api/options/month', (req, res) => {
   `;
   con.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const months = rows.map(row => row.year);
+    const months = rows.map(r => r.month); // ✅ [1,2,...12]
     res.json(months);
   });
 });
-
+//------------------------------------------SELECT year-------------------------------------------------------------
 app.get('/api/options/year', (req, res) => {
   const sql = `
     SELECT DISTINCT YEAR(birth_date) AS year
@@ -325,7 +359,7 @@ app.get('/api/options/year', (req, res) => {
     WHERE birth_date IS NOT NULL
     ORDER BY year DESC
   `;
-  
+
   con.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
@@ -333,30 +367,58 @@ app.get('/api/options/year', (req, res) => {
     res.json(years); // ✅ ต้องเป็น JSON
   });
 });
+//------------------------------------------SELECT days-------------------------------------------------------------
+app.get('/api/options/day', (req, res) => {
+  const sql = `
+    SELECT DISTINCT DAY(birth_date) AS DAY
+    FROM person
+    WHERE birth_date IS NOT NULL
+    ORDER BY DAY DESC
+  `;
 
-app.get('/api/options/district', (req, res) => {
-  const sql = `SELECT DISTINCT d.name_th FROM district d JOIN person p ON p.district_id = d.id ORDER BY d.name_th`;
   con.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const districts = rows.map(r => r.name_th);
+
+    const days = rows.map(row => row.DAY);
+    res.json(days); // ✅ ต้องเป็น JSON
+  });
+});
+//------------------------------------------SELECT district-------------------------------------------------------------
+app.get('/api/options/district', (req, res) => {
+  const sql = `
+    SELECT DISTINCT name_th FROM district ORDER BY name_th
+  `;
+  con.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const districts = rows.map(r => r.name_th.trim());
     res.json(districts);
   });
 });
+//------------------------------------------SELECT subdistrict-------------------------------------------------------------
 app.get('/api/options/subdistrict', (req, res) => {
   const { districtName } = req.query;
+
+  if (!districtName) {
+    return res.status(400).json({ error: 'districtName is required' });
+  }
+
   const sql = `
-    SELECT DISTINCT s.name_th FROM subdistrict s
+    SELECT DISTINCT s.name_th AS subdistrict
+    FROM sub_district s
     JOIN district d ON s.district_id = d.id
     JOIN person p ON p.subdistrict_id = s.id
     WHERE d.name_th = ?
     ORDER BY s.name_th
   `;
+
   con.query(sql, [districtName], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const subdistricts = rows.map(r => r.name_th);
+    const subdistricts = rows.map(r => r.subdistrict);
     res.json(subdistricts);
   });
 });
+
+
 
 app.listen(3000, () => {
   console.log("Server is running : 3000")

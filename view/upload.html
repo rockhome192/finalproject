@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>อัปโหลดข้อมูล CSV</title>
+  <style>
+    body {
+      font-family: "Kanit", sans-serif;
+      background-color: #a3d7a5;
+      padding: 40px;
+      margin: 0;
+    }
+
+    .nav-buttons {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .nav-buttons button {
+      font-size: 18px;
+      background-color: #e7fdd5;
+      border: 2px solid #8dc891;
+      border-radius: 12px;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    .nav-buttons button.active {
+      background-color: orange;
+      color: white;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      width: 500px;
+      margin: 0 auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button[type="submit"] {
+      background-color: #8dc891;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #ccc;
+      border-top-color: #333;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="nav-buttons">
+    <button onclick="location.href='/index'">แผนที่</button>
+    <button onclick="location.href='/chart'">กราฟ</button>
+    <button class="active">ข้อมูล</button>
+    <button onclick="location.href='/manage'">จัดการข้อมูล</button>
+    <button onclick="location.href='/logout'" style="background-color: orange; color: white;">ออก</button>
+  </div>
+
+  <div class="card">
+    <h2>📂 อัปโหลดไฟล์ CSV</h2>
+    <form id="uploadForm">
+      <input type="file" name="csvFile" accept=".csv" required><br>
+      <button type="submit">Upload</button>
+    </form>
+
+    <div id="loading">
+      <span class="spinner"></span> กำลังอัปโหลดและประมวลผลข้อมูล...
+    </div>
+  </div>
+
+  <script>
+  const form = document.getElementById('uploadForm');
+  const loading = document.getElementById('loading');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); // ไม่ให้โหลดหน้าใหม่
+    loading.style.display = 'block';
+
+    const formData = new FormData(form);
+    try {
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await response.json();
+
+      // ✅ ซ่อน loading ก่อน alert
+      loading.style.display = 'none';
+
+      // ✅ ค่อยแสดง alert หลังจาก loading หาย
+      if (result.status === 'success') {
+        alert(`✅ อัปโหลดสำเร็จ: เพิ่มข้อมูล ${result.inserted} รายการ`);
+      } else {
+        alert(`❌ เกิดข้อผิดพลาด: ${result.error || 'ไม่ทราบสาเหตุ'}`);
+      }
+    } catch (err) {
+      loading.style.display = 'none';
+      alert('❌ ไม่สามารถอัปโหลดไฟล์ได้');
+      console.error(err);
+    }
+  });
+</script>
+
+</body>
+</html>

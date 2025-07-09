@@ -67,13 +67,12 @@
                     <b>รายได้</b>
                     <div class="checkbox-group">
                         <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
-                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
-                        <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
-                        <label><input type="checkbox" name="income" value="รายได้น้อย" /> น้อย</label>
-                        <label><input type="checkbox" name="income"
-                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนข้างสูง</label>
-                        <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
-                        <label><input type="checkbox" name="income" value="ไม่ระบุ" />ไม่ระบุ</label>
+                        <label><input type="checkbox" name="income" value="น้อยมาก" />น้อยมาก</label>
+                        <label><input type="checkbox" name="income" value="น้อย" />น้อย</label>
+                        <label><input type="checkbox" name="income" value="ปานกลาง" />ปานกลาง</label>
+                        <label><input type="checkbox" name="income" value="ปานกลางค่อนสูง" />ปานกลางค่อนข้างสูง</label>
+                        <label><input type="checkbox" name="income" value="สูง" />สูง</label>
+                        <label><input type="checkbox" name="income" value="สูงมาก" />สูงมาก</label>
                     </div>
                 </div>
 
@@ -179,7 +178,7 @@
                         option.textContent = year;
                         select.appendChild(option);
                     });
-                 
+
                 } catch (err) {
                     console.error('โหลดปีไม่สำเร็จ:', err);
                 }
@@ -191,7 +190,6 @@
                     const months = await res.json(); // เช่น [1, 2, 3, ..., 12]
                     const select = document.getElementById('month');
                     select.innerHTML = '<option value="">เดือน</option>';
-
                     const monthMap = {
                         1: 'มกราคม',
                         2: 'กุมภาพันธ์',
@@ -213,7 +211,7 @@
                         option.textContent = monthMap[monthNum]; // ✅ แสดงชื่อไทย
                         select.appendChild(option);
                     });
-             
+
                 } catch (err) {
                     console.error('โหลดเดือนไม่สำเร็จ:', err);
                 }
@@ -233,7 +231,7 @@
                         option.textContent = date;
                         select.appendChild(option);
                     });
-                 
+
                 } catch (err) {
                     console.error('โหลดวันไม่สำเร็จ:', err);
                 }
@@ -293,9 +291,79 @@
                     console.error('โหลดตำบลไม่สำเร็จ:', err);
                 }
             });
+            async function zoomToSubdistrict(districtName, subdistrictName) {
+                const payload = {
+                    districtName,
+                    incomeLevels: [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value),
+                    genders: [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value),
+                    ageGroups: [...document.querySelectorAll('input[name="ageGroups"]:checked')].map(cb => cb.value),
+                    seasons: [...document.querySelectorAll('input[name="season"]:checked')].map(cb => cb.value),
+                };
+
+                const year = document.getElementById('year').value;
+                const month = document.getElementById('month').value;
+                const date = document.getElementById('date').value;
+                if (year) payload.year = parseInt(year);
+                if (month) payload.month = parseInt(month);
+                if (date) payload.date = parseInt(date);
+
+                const res = await fetch(`http://localhost:3000/subdistrict-map-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!window.geoLayer) {
+                    window.geoLayer = L.layerGroup().addTo(map);
+                } else {
+                    window.geoLayer.clearLayers();
+                }
+
+
+                window.geoLayer = L.geoJSON(data.features, {
+                    style: feature => {
+                        const subdistrict = normalizeName(feature.properties.tam_th);
+                        const risk = data.riskBySubdistrict[subdistrict] || 'ไม่ระบุ';
+                        return {
+                            fillColor: getColor(risk),
+                            weight: 1,
+                            color: 'white',
+                            fillOpacity: 0.6
+                        };
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const subdistrict = normalizeName(feature.properties.tam_th);
+                        const risk = data.riskBySubdistrict[subdistrict] || 'ไม่ระบุ';
+                        const counts = data.subdistrictStats?.[subdistrict];
+                        const detail = counts ? `<br>ต่ำ: ${counts.low} กลาง: ${counts.medium} สูง: ${counts.high}` : '';
+                        layer.bindPopup(`<b>ตำบล:</b> ${subdistrict}<br><b>ระดับ:</b> ${risk}${detail}`);
+
+                        // ✅ ซูมเฉพาะตำบลที่เลือก
+                        if (subdistrict === normalizeName(subdistrictName)) {
+                            const bounds = layer.getBounds();
+                            map.fitBounds(bounds);
+                           // layer.openPopup();
+                        }
+                    }
+                }).addTo(map);
+
+                levelControl.getContainer().innerHTML = `<b>ระดับ: ตำบล (${districtName})</b>`;
+                currentLevel = 'subdistrict';
+                currentDistrict = districtName;
+            }
 
             // เพิ่ม event ให้ subdistrict ด้วย
-            document.getElementById('subdistrict').addEventListener('change', updateMap);
+            document.getElementById('subdistrict').addEventListener('change', async () => {
+                const district = document.getElementById('district').value;
+                const subdistrict = document.getElementById('subdistrict').value;
+                if (district && subdistrict) {
+                    await zoomToSubdistrict(district, subdistrict);
+                } else {
+                    updateMap(); // fallback ธรรมดา
+                }
+            });
+
 
 
 
@@ -406,9 +474,12 @@
 
 
             function drawGeoLayer(data) {
-                if (window.geoLayer) {
-                    map.removeLayer(window.geoLayer);
+                if (!window.geoLayer) {
+                    window.geoLayer = L.layerGroup().addTo(map);
+                } else {
+                    window.geoLayer.clearLayers();
                 }
+
 
                 console.log('District keys:', Object.keys(data.riskByDistrict));
 
@@ -452,16 +523,40 @@
                         async function loadSubdistrict(districtName) {
                             console.log('โหลดตำบลของ:', districtName);
 
+                            // 👇 สร้าง payload จาก checkbox และ dropdown
+                            const incomeLevels = [...document.querySelectorAll('input[name="income"]:checked')].map(cb => cb.value);
+                            const genders = [...document.querySelectorAll('input[name="gender"]:checked')].map(cb => cb.value);
+                            const ageGroups = [...document.querySelectorAll('input[name="ageGroups"]:checked')].map(cb => cb.value);
+                            const seasons = [...document.querySelectorAll('input[name="season"]:checked')].map(cb => cb.value);
+
+                            const year = document.getElementById('year').value;
+                            const month = document.getElementById('month').value;
+                            const date = document.getElementById('date').value;
+
+                            const payload = {
+                                districtName,
+                                incomeLevels,
+                                genders,
+                                ageGroups,
+                                seasons,
+                            };
+
+                            if (year) payload.year = parseInt(year);
+                            if (month) payload.month = parseInt(month);
+                            if (date) payload.date = parseInt(date);
+
                             const res = await fetch(`http://localhost:3000/subdistrict-map-data`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ districtName })
+                                body: JSON.stringify(payload)
                             });
 
                             const data = await res.json();
 
-                            if (window.geoLayer) {
-                                map.removeLayer(window.geoLayer);
+                            if (!window.geoLayer) {
+                                window.geoLayer = L.layerGroup().addTo(map);
+                            } else {
+                                window.geoLayer.clearLayers();
                             }
 
                             window.geoLayer = L.geoJSON(data.features, {
@@ -493,6 +588,7 @@
                             currentDistrict = districtName;
                             levelControl.getContainer().innerHTML = `<b>ระดับ: ตำบล (${districtName})</b>`;
                         }
+
 
 
                     }

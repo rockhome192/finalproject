@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 
 
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -241,13 +242,21 @@ const sql = `
 
 //--------------------------------------subdistrict-------------
 app.post('/subdistrict-map-data', (req, res) => {
-  const { districtName } = req.body;
   const {
+    districtName,
     incomeLevels,
     ageGroups,
     genders,
-    seasons
-  } = req.body
+    seasons,
+    year,
+    month,
+    date
+  } = req.body;
+
+  if (!districtName) {
+    return res.status(400).json({ error: 'districtName is required' });
+  }
+
   const conditions = [];
   const values = [];
 
@@ -271,8 +280,22 @@ app.post('/subdistrict-map-data', (req, res) => {
     values.push(...seasons);
   }
 
-  const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
+  if (year) {
+    conditions.push(`YEAR(p.birth_date) = ?`);
+    values.push(year);
+  }
 
+  if (month) {
+    conditions.push(`MONTH(p.birth_date) = ?`);
+    values.push(month);
+  }
+
+  if (date) {
+    conditions.push(`DAY(p.birth_date) = ?`);
+    values.push(date);
+  }
+
+  const whereClause = conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : '';
 
   const sql = `
     SELECT 
@@ -284,22 +307,22 @@ app.post('/subdistrict-map-data', (req, res) => {
     JOIN sub_district s ON p.subdistrict_id = s.id
     JOIN district d ON p.district_id = d.id
     WHERE d.name_th = ? AND p.predict IS NOT NULL
-     ${whereClause ? 'AND ' + whereClause : ''}
+    ${whereClause}
     GROUP BY p.subdistrict_id;
   `;
 
-  con.query(sql, [districtName], (err, rows) => {
+  con.query(sql, [districtName, ...values], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const riskBySubdistrict = {};
     const subdistrictStats = {};
+
     rows.forEach(row => {
       const low = Number(row.count_low);
       const medium = Number(row.count_medium);
       const high = Number(row.count_high);
 
       const max = Math.max(low, medium, high);
-
       let risk = 'ไม่ระบุ';
       if (max === high) risk = 'เฝ้าระวังสูง';
       else if (max === medium) risk = 'เฝ้าระวังกลาง';
@@ -310,18 +333,13 @@ app.post('/subdistrict-map-data', (req, res) => {
       subdistrictStats[name] = { low, medium, high };
     });
 
-
-    console.log('SQL result rows:', rows);
     const geojsonPath = path.join(__dirname, 'data/chiangrai_subdistricts.geojson');
     fs.readFile(geojsonPath, 'utf8', (geoErr, geoData) => {
       if (geoErr) return res.status(500).json({ error: geoErr.message });
 
       const geojson = JSON.parse(geoData);
-
-      // filter เฉพาะอำเภอที่เลือก
       const filteredFeatures = geojson.features.filter(f => f.properties.amp_th.trim() === districtName.trim());
 
-      // เติม "ไม่ระบุ" ถ้าไม่มีใน riskBySubdistrict
       filteredFeatures.forEach(feature => {
         const subdistrictName = feature.properties.tam_th.trim();
         if (!riskBySubdistrict[subdistrictName]) {
@@ -337,6 +355,7 @@ app.post('/subdistrict-map-data', (req, res) => {
     });
   });
 });
+
 //------------------------------------------SELECT-------------------------------------------------------------
 app.get('/api/options/month', (req, res) => {
   const sql = `
@@ -415,6 +434,365 @@ app.get('/api/options/subdistrict', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     const subdistricts = rows.map(r => r.subdistrict);
     res.json(subdistricts);
+  });
+});
+
+//----------------------------------------------------------UPLOAD----------------------------------------------------------
+const multer = require('multer');
+const { spawn } = require('child_process');
+const upload = multer({ dest: 'uploads/' }); // เก็บไฟล์ชั่วคราว
+
+// Serve upload page
+app.get('/upload', (req, res) => {
+  res.sendFile(path.join(__dirname, 'view', 'upload.html'));
+});
+
+app.post('/upload', upload.single('csvFile'), (req, res) => {
+  const filePath = req.file.path;
+
+  const python = spawn('python', ['ml_predict.py', filePath]);
+
+  let output = '';
+  python.stdout.on('data', (data) => output += data.toString());
+  python.stderr.on('data', (err) => console.error('Python Error:', err.toString()));
+
+  python.on('close', (code) => {
+    try {
+      let results = JSON.parse(output);
+
+      // กรองเอาแค่จังหวัดเชียงราย
+      results = results.filter(row => row['Pro.จังหวัด'] === 'จ.เชียงราย');
+
+if (results.length === 0) {
+  return res.json({ status: 'no_data', message: 'ไม่พบข้อมูลจังหวัดเชียงรายในไฟล์ที่อัปโหลด' });
+}
+
+      // ฟังก์ชันแปลงข้อมูล
+      function combine_income(row) {
+        const parts = [];
+        if (row['ระดับรายได้_ไม่มีรายได้'] === 1) parts.push("ไม่มีรายได้");
+        if (row['ระดับรายได้_สูงมาก'] === 1) parts.push("รายได้สูงมาก");
+        if (row['ระดับรายได้_ปานกลาง'] === 1) parts.push("รายได้ปานกลาง");
+        if (row['ระดับรายได้_ปานกลางค่อนสูง'] === 1) parts.push("รายได้ปานกลางค่อนสูง");
+        if (row['ระดับรายได้_น้อย'] === 1) parts.push("รายได้น้อย");
+        if (row['ระดับรายได้_น้อยมาก'] === 1) parts.push("รายได้น้อยมาก");
+        return parts.length ? parts.join(' / ') : "ไม่ระบุ";
+      }
+
+      function combine_marital(row) {
+        const parts = [];
+        if (row['สถานภาพสมรส_โสด'] === 1) parts.push("โสด");
+        if (row['สถานภาพสมรส_คู่'] === 1) parts.push("คู่");
+        if (row['สถานภาพสมรส_หย่า'] === 1) parts.push("หย่า");
+        if (row['สถานภาพสมรส_หม้าย'] === 1) parts.push("หม้าย");
+        if (row['สถานภาพสมรส_ไม่ทราบ'] === 1) parts.push("ไม่ทราบ");
+        if (row['สถานภาพสมรส_ไม่กรอกข้อมูล/ว่าง'] === 1) parts.push("ไม่กรอกข้อมูล/ว่าง");
+        return parts.length ? parts.join(' / ') : "ไม่ระบุ";
+      }
+
+      function combine_season(row) {
+        const parts = [];
+        if (row['ฤดูกาล_ฤดูหนาว'] === 1) parts.push("ฤดูหนาว");
+        if (row['ฤดูกาล_ฤดูฝน'] === 1) parts.push("ฤดูฝน");
+        if (row['ฤดูกาล_ฤดูร้อน'] === 1) parts.push("ฤดูร้อน");
+        return parts.length ? parts.join(' / ') : "ไม่ระบุ";
+      }
+
+      function combine_age(row) {
+        const parts = [];
+        if (row['ช่วงอายุ_ผู้สูงอายุ'] === 1) parts.push("ผู้สูงอายุ");
+        if (row['ช่วงอายุ_เด็ก'] === 1) parts.push("เด็ก");
+        if (row['ช่วงอายุ_ผู้ใหญ่ตอนกลาง'] === 1) parts.push("ผู้ใหญ่ตอนกลาง");
+        if (row['ช่วงอายุ_ผู้ใหญ่ตอนต้น'] === 1) parts.push("ผู้ใหญ่ตอนต้น");
+        if (row['ช่วงอายุ_วัยรุ่น'] === 1) parts.push("วัยรุ่น");
+        return parts.length ? parts.join(' / ') : "ไม่ระบุ";
+      }
+
+      function combine_income2(row){
+        const income = {
+          
+        }
+      }
+
+      function combine_district_from_string(row) {
+  const map = {
+    'อ.เมืองเชียงราย': 1,
+    'อ.เวียงชัย': 2,
+    'อ.เชียงของ': 3,
+    'อ.เทิง': 4,
+    'อ.พาน': 5,
+    'อ.ป่าแดด': 6,
+    'อ.แม่จัน': 7,
+    'อ.เชียงแสน': 8,
+    'อ.แม่สาย': 9,
+    'อ.แม่สรวย': 10,
+    'อ.เวียงป่าเป้า': 11,
+    'อ.พญาเม็งราย': 12,
+    'อ.เวียงแก่น': 13,
+    'อ.ขุนตาล': 14,
+    'อ.แม่ฟ้าหลวง': 15,
+    'อ.แม่ลาว': 16,
+    'อ.เวียงเชียงรุ้ง': 17,
+    'อ.ดอยหลวง': 18,
+  };
+  const name = row['Pro.อำเภอ / เขต']?.trim();
+  return map[name] || null;
+}
+
+      function combine_subdistrict(row) {
+        const subdistrict_map = {
+    'ต.เวียง': 101,
+    'ต.รอบเวียง': 102,
+    'ต.บ้านดู่': 103,
+    'ต.นางแล': 104,
+    'ต.แม่ข้าวต้ม': 105,
+    'ต.แม่ยาว': 106,
+    'ต.สันทราย': 107,
+    'ต.แม่กรณ์': 108,
+    'ต.ห้วยชมภู': 109,
+    'ต.ห้วยสัก': 110,
+    'ต.ริมกก': 111,
+    'ต.ดอยลาน': 112,
+    'ต.ป่าอ้อดอนชัย': 113,
+    'ต.ท่าสาย': 114,
+    'ต.ดอยฮาง': 115,
+    'ต.ท่าสุด': 116,
+    'ต.เวียงชัย': 201,
+    'ต.ผางาม': 202,
+    'ต.เวียงเหนือ': 203,
+    'ต.ดอนศิลา': 204,
+    'ต.เมืองชุม': 205,
+    'ต.สถาน': 302,
+    'ต.ครึ่ง': 303,
+    'ต.บุญเรือง': 304,
+    'ต.ห้วยซ้อ': 305,
+    'ต.ศรีดอนชัย': 306,
+    'ต.ริมโขง': 307,
+    'ต.งิ้ว': 402,
+    'ต.ปล้อง': 403,
+    'ต.แม่ลอย': 404,
+    'ต.เชียงเคี่ยน': 405,
+    'ต.ตับเต่า': 406,
+    'ต.หงาว': 407,
+    'ต.สันทรายงาม': 408,
+    'ต.ศรีดอนไชย': 409,
+    'ต.หนองแรด': 410,
+    'ต.สันมะเค็ด': 501,
+    'ต.แม่อ้อ': 502,
+    'ต.ธารทอง': 503,
+    'ต.สันติสุข': 504,
+    'ต.ดอยงาม': 505,
+    'ต.หัวง้ม': 506,
+    'ต.เจริญเมือง': 507,
+    'ต.ป่าหุ่ง': 508,
+    'ต.ม่วงคำ': 509,
+    'ต.ทรายขาว': 510,
+    'ต.สันกลาง': 511,
+    'ต.แม่เย็น': 512,
+    'ต.เมืองพาน': 513,
+    'ต.ทานตะวัน': 514,
+    'ต.เวียงห้าว': 515,
+    'ต.ป่าแดด': 601,
+    'ต.ป่าแงะ': 602,
+    'ต.สันมะค่า': 603,
+    'ต.โรงช้าง': 604,
+    'ต.ศรีโพธิ์เงิน': 605,
+    'ต.แม่จัน': 701,
+    'ต.จันจว้า': 702,
+    'ต.แม่คำ': 703,
+    'ต.ป่าซาง': 704,
+    'ต.สันทราย': 705,
+    'ต.ท่าข้าวเปลือก': 706,
+    'ต.ป่าตึง': 707,
+    'ต.แม่ไร่': 708,
+    'ต.ศรีค้ำ': 709,
+    'ต.จันจว้าใต้': 710,
+    'ต.จอมสวรรค์': 711,
+    'ต.ป่าสัก': 802,
+    'ต.บ้านแซว': 803,
+    'ต.ศรีดอนมูล': 804,
+    'ต.แม่เงิน': 805,
+    'ต.โยนก': 806,
+    'ต.แม่สาย': 901,
+    'ต.ห้วยไคร้': 902,
+    'ต.เกาะช้าง': 903,
+    'ต.โป่งผา': 904,
+    'ต.ศรีเมืองชุม': 905,
+    'ต.เวียงพางคำ': 906,
+    'ต.บ้านด้าย': 907,
+    'ต.โป่งงาม': 908,
+    'ต.แม่สรวย': 1001,
+    'ต.แม่พริก': 1003,
+    'ต.ศรีถ้อย': 1004,
+    'ต.ท่าก๊อ': 1005,
+    'ต.วาวี': 1006,
+    'ต.เจดีย์หลวง': 1007,
+    'ต.สันสลี': 1101,
+    'ต.บ้านโป่ง': 1103,
+    'ต.ป่างิ้ว': 1104,
+    'ต.เวียงกาหลง': 1105,
+    'ต.แม่เจดีย์': 1106,
+    'ต.แม่เจดีย์ใหม่': 1107,
+    'ต.แม่เปา': 1201,
+    'ต.แม่ต๋ำ': 1202,
+    'ต.ไม้ยา': 1203,
+    'ต.เม็งราย': 1204,
+    'ต.ตาดควัน': 1205,
+    'ต.ม่วงยาย': 1301,
+    'ต.ปอ': 1302,
+    'ต.หล่ายงาว': 1303,
+    'ต.ท่าข้าม': 1304,
+    'ต.ต้า': 1401,
+    'ต.ป่าตาล': 1402,
+    'ต.ยางฮอม': 1403,
+    'ต.เทอดไทย': 1501,
+    'ต.แม่สลองใน': 1502,
+    'ต.แม่สลองนอก': 1503,
+    'ต.แม่ฟ้าหลวง': 1504,
+    'ต.ดงมะดะ': 1601,
+    'ต.จอมหมอกแก้ว': 1602,
+    'ต.บัวสลี': 1603,
+    'ต.ป่าก่อดำ': 1604,
+    'ต.โป่งแพร่': 1605,
+    'ต.ทุ่งก่อ': 1701,
+    'ต.ดงมหาวัน': 1702,
+    'ต.ปงน้อย': 1801,
+    'ต.โชคชัย': 1802,
+    'ต.หนองป่าก่อ': 1803,
+}
+         const name = row["Pro.ตำบล / แขวง"]?.trim();
+      return subdistrict_map[name] || null;
+   }
+      
+
+      function combine_birth_date(row) {
+        const y = parseInt(row['ปี']);
+        const m = parseInt(row['เดือน']);
+        const d = parseInt(row['วันที่']);
+        if (!y || !m || !d) return null;
+        const gregorianYear = String(y).padStart(2, '0');
+        const mm = String(m).padStart(2, '0');
+        const dd = String(d).padStart(2, '0');
+        return `${gregorianYear}-${mm}-${dd}`;
+      }
+
+      function map_gender(val) {
+        if (val === 0) return "ชาย";
+        if (val === 1) return "หญิง";
+        return null;
+      }
+
+      results = results.map(row => ({
+        id: row['ลำดับ'],
+        gender: row['เพศ'],
+        marital_status: row["สถานภาพสมรส"],
+        monthly_income: row["ระดับรายได้"],
+        season: row['ฤดูกาล'],
+        age_range: row["ช่วงอายุ"],
+        district_id: combine_district_from_string(row),
+        subdistrict_id: combine_subdistrict(row),
+        birth_date: combine_birth_date(row),
+        province_id: 1,  // รหัสจังหวัดเชียงราย
+        predict: row['predict'],
+
+        // // แปลงฟีเจอร์อื่นๆ จาก ordinal_features (true/false = 1/0)
+        // life_problems: row['ประสบปัญหาชีวิต'] || 0,
+        // relationship_loss: row['สูญเสียความสัมพันธ์'] || 0,
+        // in_debt: row['เป็นหนี้'] || 0,
+        // conflict_with_significant: row['เกิดความขัดแย้งรุนแรงกับคนสำคัญในชีวิต'] || 0,
+        // career_failure: row['ประสบความล้มเหลวในการงาน'] || 0,
+        // public_shame: row['ถูกตำหนิให้อับอาย'] || 0,
+        // health_problems: row['ปัญหาสุขภาพ'] || 0,
+        // legal_issues: row['มีคดีความ'] || 0,
+        // social_isolation: row['Social isolation'] || 0,
+        // academic_failure: row['ล้มเหลวในการเรียน'] || 0,
+        // violent_relationship: row['Violence relationship'] || 0,
+        // psychiatric_trigger: row['ปัจจัยกระตุ้นอาการทางจิตเวชกำเริบ'] || 0,
+        // depression: row['โรคซึมเศร้า'] || 0,
+        // bipolar_disorder: row['โรคไบโพล่าร์'] || 0,
+        // schizophrenia: row['โรคจิตเภท'] || 0,
+        // personality_disorder: row['โรคบุคลิกภาพผิดปกติ'] || 0,
+        // anxiety_disorder: row['โรควิตกังวล'] || 0,
+        // substance_trigger: row['ปัจจัยกระตุ้นเกิดพิษหรือฤทธิ์สารเสพติดที่เสพ'] || 0,
+        // suicide_news_trigger: row['ปัจจัยกระตุ้นจากรับรู้ข่าวการฆ่าตัวตาย'] || 0,
+        // r1_psychiatric_illness: row['R1.ป่วยด้วยโรคจิตเวช'] || 0,
+        // r1_depression: row['R1.โรคซึมเศร้า'] || 0,
+        // r1_bipolar: row['R1.โรคไบโพล่าร์'] || 0,
+        // r1_schizophrenia: row['R1.โรคจิตเภท'] || 0,
+        // r1_personality_disorder: row['R1.โรคบุคลิกภาพผิดปกติ'] || 0,
+        // r1_anxiety: row['R1.โรควิตกังวล'] || 0,
+        // r2_alcohol_use: row['R2.ป่วยด้วยโรคติดสุรา'] || 0,
+        // r3_substance_addiction: row['R3.ติดสารเสพติด'] || 0,
+        // r4_physical_illness_risk: row['R4.ปัจจัยเสี่ยงโรคทางกาย'] || 0,
+        // chronic_pain: row['โรคปวดเรื้อรัง'] || 0,
+        // stroke_paralysis: row['อัมพาต/โรคหลอดเลือดสมอง'] || 0,
+        // cancer: row['โรคมะเร็ง'] || 0,
+        // chronic_liver_disease: row['โรคตับเรื้อรัง'] || 0,
+        // chronic_kidney_failure: row['ไตวายเรื้อรัง'] || 0,
+        // disability: row['พิการ'] || 0,
+        // chronic_headache: row['ปวดศีรษะเรื้อรัง'] || 0,
+        // heart_disease: row['โรคหัวใจ'] || 0,
+        // hiv: row['โรคเอดส์/HIV'] || 0,
+        // r5_personality_traits: row['R5.บุคลิกภาพ'] || 0,
+        // r5a_impulsive: row['R5A.บุคลิกภาพหุนหันพลันแล่น (Impulsive)'] || 0,
+        // r5b_perfectionist: row['R5B.นิยมความสมบูรณ์แบบ (Perfectionism)'] || 0,
+        // r6_previous_suicide_attempt: row['R6.ตนเองเคยฆ่าตัวตาย'] || 0,
+        // r7_family_suicide_history: row['R7.คนในครอบครัวเคยฆ่าตัวตาย'] || 0,
+        // r8_childhood_trauma: row['R8.Childhood trauma'] || 0,
+        // r9_personal_beliefs: row['R9.ค่านิยมความเชื่อส่วนบุคคล'] || 0,
+        // prof1_personal: row['Prof1.ส่วนตัว'] || 0,
+        // prof2_family: row['Prof2.ครอบครัว'] || 0,
+        // prof3_friends: row['Prof3.เพื่อน'] || 0,
+        // prof4_community: row['Prof4.ชุมชน'] || 0,
+        // prof5_healthcare_access: row['Prof5.กาเข้าถึงบริการสุขภาพ'] || 0,
+        // prof6_problem_solving_skills: row['Prof6.ทักษะการแก้ไขปัญหา'] || 0,
+        // substance_control_barrier: row['ด่านกั้นควบคุมสารพิษ วัสดุอุปกรณ์ในครอบครัวหรือในพื้นที่'] || 0,
+        // site_restriction_barrier: row['ด่านกั้นการปิดกั้นหรือเฝ้าระวังป้องกันสถานที่'] || 0,
+        // suicide_warning_signs: row['สัญญาณเตือนการฆ่าตัวตาย'] || 0,
+        // physical_injury_treatment: row['การรักษาอาการบาดเจ็บทางกาย'] || 0,
+        // psychiatric_assessment: row['การตรวจประเมินตามมาตรฐานจิตเวชและการช่วยเหลือทางสังคมจิตใจ'] || 0,
+        // crisis_intervention: row['การแก้ไขปัญหาหรือวิกฤติชีวิตที่เป็นปัจจัยกระตุ้น'] || 0,
+        // risk_reduction: row['การลดหรือขจัดปัจจัยเสี่ยง'] || 0,
+        // protective_factors: row['การสร้างและเสริมปัจจัยปกป้อง ระดับบุคคลและระดับครอบครัว'] || 0,
+        // ongoing_support: row['การติดตามช่วยเหลือต่อเนื่องป้องกันการกระทำรุนแรงต่อตนเองซ้ำ'] || 0,
+      }));
+      
+      
+
+      // อัปเดตฐานข้อมูลทีละแถว
+      results.forEach(row => {
+  const sql = `
+    INSERT INTO person
+      (gender, marital_status, monthly_income, season, age_range, district_id, subdistrict_id, birth_date, province_id, predict)
+    VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const values = [
+    row.gender, row.marital_status, row.monthly_income, row.season, row.age_range,
+    row.district_id, row.subdistrict_id, row.birth_date, row.province_id, row.predict,
+  ];
+
+  if (values.length !== 10) {
+    console.error(`Error: values count mismatch, got ${values.length} values but expected 10`);
+    return;
+  }
+
+  con.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('DB Insert Error:', err);
+    }
+  });
+});
+
+      
+      console.log("parsed results:", results);
+      res.json({ status: 'success', inserted: results.length });
+    } catch (e) {
+    
+      console.error('Parse Error:', e);
+      res.status(500).json({ status: 'error', message: 'Failed to process data.' });
+    }
   });
 });
 

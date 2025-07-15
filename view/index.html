@@ -67,12 +67,12 @@
                     <b>รายได้</b>
                     <div class="checkbox-group">
                         <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
-                        <label><input type="checkbox" name="income" value="น้อยมาก" />น้อยมาก</label>
-                        <label><input type="checkbox" name="income" value="น้อย" />น้อย</label>
-                        <label><input type="checkbox" name="income" value="ปานกลาง" />ปานกลาง</label>
-                        <label><input type="checkbox" name="income" value="ปานกลางค่อนสูง" />ปานกลางค่อนข้างสูง</label>
-                        <label><input type="checkbox" name="income" value="สูง" />สูง</label>
-                        <label><input type="checkbox" name="income" value="สูงมาก" />สูงมาก</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนข้างสูง</label>
+                       <!--  <label><input type="checkbox" name="income" value="รายได้สูง" />สูง</label> -->
+                        <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
                     </div>
                 </div>
 
@@ -254,7 +254,7 @@
             async function loadDistrictOptions() {
                 try {
                     const res = await fetch('http://localhost:3000/api/options/district');
-                    const districts = await res.json(); // เช่น ["เมืองเชียงราย", "แม่สาย", ...]
+                    const districts = await res.json();
                     const select = document.getElementById('district');
                     select.innerHTML = '<option value="none">อำเภอ</option>';
 
@@ -264,46 +264,50 @@
                         option.textContent = name;
                         select.appendChild(option);
                     });
+
+                    // ✅ ปิด dropdown ตำบลตอนแรก
+                    document.getElementById('subdistrict').disabled = true;
+
                 } catch (err) {
                     console.error('โหลดอำเภอไม่สำเร็จ:', err);
                 }
             }
 
+            document.getElementById('subdistrict').disabled = true;
+
             // โหลดตำบล เมื่อเลือกอำเภอ
             document.getElementById('district').addEventListener('change', async (e) => {
                 const districtName = e.target.value;
-                console.log('District selected:', districtName);
 
-                if (!districtName || districtName === 'อำเภอ') {
+                if (!districtName || districtName === 'อำเภอ' || districtName === 'none') {
                     document.getElementById('subdistrict').innerHTML = '<option value="none">ตำบล</option>';
-                    updateMap(); // ✅ เพิ่มตรงนี้เพื่อให้ map refresh เมื่อ clear district
+                    document.getElementById('subdistrict').disabled = true; // ✅ ปิด
+                    updateMap();
                     return;
                 }
 
                 try {
                     const res = await fetch(`http://localhost:3000/api/options/subdistrict?districtName=${encodeURIComponent(districtName)}`);
                     const data = await res.json();
-                    console.log('Subdistricts:', data);
 
                     const select = document.getElementById('subdistrict');
                     select.innerHTML = '<option value="">ตำบล</option>';
 
-                    if (Array.isArray(data)) {
-                        data.forEach(name => {
-                            const option = document.createElement('option');
-                            option.value = name;
-                            option.textContent = name;
-                            select.appendChild(option);
-                        });
-                    }
+                    data.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        select.appendChild(option);
+                    });
 
+                    select.disabled = false; // ✅ เปิดใช้งานตำบลหลังโหลดเสร็จ
 
-                    updateMap(); // ✅ เพิ่มตรงนี้ให้ map อัปเดตหลังจากเลือกอำเภอ
-
+                    updateMap();
                 } catch (err) {
                     console.error('โหลดตำบลไม่สำเร็จ:', err);
                 }
             });
+
             async function zoomToSubdistrict(districtName, subdistrictName) {
                 const payload = {
                     districtName,
@@ -377,48 +381,48 @@
                 }
             });
 
-async function updateDateDropdowns() {
-    const filter = {
-        year: document.getElementById('year').value || null,
-        month: document.getElementById('month').value || null,
-        day: document.getElementById('date').value || null
-    };
+            async function updateDateDropdowns() {
+                const filter = {
+                    year: document.getElementById('year').value || null,
+                    month: document.getElementById('month').value || null,
+                    day: document.getElementById('date').value || null
+                };
 
-    // เรียกโหลด dropdown ทั้ง 3 ตัวพร้อมกัน
-    await Promise.all([
-        loadYearOptions(filter),
-        loadMonthOptions(filter),
-        loadDayOptions(filter),
-        loadDistrictOptions()
-    ]);
+                // เรียกโหลด dropdown ทั้ง 3 ตัวพร้อมกัน
+                await Promise.all([
+                    loadYearOptions(filter),
+                    loadMonthOptions(filter),
+                    loadDayOptions(filter),
+                    loadDistrictOptions()
+                ]);
 
-    // โหลดแผนที่หรือข้อมูลอื่น ๆ ตาม filter ที่อัปเดต
-    updateMap();
-}
-['year', 'month', 'date'].forEach(id => {
-    const el = document.getElementById(id);
-    el.addEventListener('change', () => {
-        updateDateDropdowns();
-    });
-});
-
-
+                // โหลดแผนที่หรือข้อมูลอื่น ๆ ตาม filter ที่อัปเดต
+                updateMap();
+            }
+            ['year', 'month', 'date'].forEach(id => {
+                const el = document.getElementById(id);
+                el.addEventListener('change', () => {
+                    updateDateDropdowns();
+                });
+            });
 
 
-window.addEventListener('DOMContentLoaded', () => {
-  // เรียก load dropdown ครั้งแรก
-  updateDateDropdowns();
 
-  // เพิ่ม listener ให้ dropdown ทั้ง 3
-  ['year', 'month', 'date'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('change', () => {
-        updateDateDropdowns();
-      });
-    }
-  });
-});
+
+            window.addEventListener('DOMContentLoaded', () => {
+                // เรียก load dropdown ครั้งแรก
+                updateDateDropdowns();
+
+                // เพิ่ม listener ให้ dropdown ทั้ง 3
+                ['year', 'month', 'date'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('change', () => {
+                            updateDateDropdowns();
+                        });
+                    }
+                });
+            });
 
 
 

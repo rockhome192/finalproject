@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/css/index.css">
+</head>
+
+<body>
+    <header>
+        <div class="top-buttons">
+            <button class="top-buttons-information">จัดการข้อมูล</button>
+            <button class="top-buttons-information">ออก</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="info-box">
+                <div class="info-box-person">
+                    <p id="summary">กำลังโหลดข้อมูล...</p>
+                    <h3>จำนวนเหตุ<br><strong id="total-events">-</strong></h3>
+                </div>
+            </div>
+
+            <form class="selectors" id="filterForm">
+                <label for="year" class="all-label">ปี</label>
+                <select id="year" name="selectedYear">
+                    <option value="">ปี</option>
+                </select>
+
+                <label for="month" class="all-label">เดือน</label>
+                <select id="month" name="selectedMonth">
+                    <option value="">เดือน</option>
+                </select>
+
+                 <label for="day" class="all-label">วัน</label>
+                <select id="day" name="selectedDay">
+                    <option value="">วัน</option>
+                </select>
+
+                 <label for="district" class="all-label">อำเภอ</label>
+                <select id="district" name="district_id">
+                    <option value="">อำเภอ</option>
+                </select>
+
+                 <label for="subdistrict" class="all-label">ตำบล</label>
+                <select id="subdistrict" name="subdistrict_id">
+                    <option value="">ตำบล</option>
+                </select>
+
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>รายได้</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
+                        <label><input type="checkbox" name="income"
+                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
+                        <!-- <label><input type="checkbox" name="income" value="ไม่ระบุ" />ไม่ระบุ</label> -->
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>อายุ</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="ageGroups" value="ผู้สูงอายุ" />ผู้สูงอายุ</label>
+                        <label><input type="checkbox" name="ageGroups" value="ผู้ใหญ่ตอนกลาง" />ผู้ใหญ่ตอนกลาง</label>
+                        <label><input type="checkbox" name="ageGroups" value="วัยรุ่น" />วัยรุ่น</label>
+                        <label><input type="checkbox" name="ageGroups" value="เด็ก" />เด็ก</label>
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>เพศ</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="gender" value="ชาย" />ชาย</label>
+                        <label><input type="checkbox" name="gender" value="หญิง" />หญิง</label>
+                    </div>
+                </div>
+
+                <div style="width: 100%; margin-top: 10px;">
+                    <b>ฤดู</b>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="season" value="ฤดูร้อน" /> ฤดูร้อน</label>
+                        <label><input type="checkbox" name="season" value="ฤดูหนาว" /> ฤดูหนาว</label>
+                        <label><input type="checkbox" name="season" value="ฤดูฝน" /> ฤดูฝน</label>
+                    </div>
+                </div>
+            </form>
+
+            <button>แผนที่</button>
+            <button>กราฟ</button>
+            <button>ข้อมูล</button>
+        </div>
+
+        <canvas id="riskChart" width="600" height="400"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('riskChart').getContext('2d');
+        let chart;
+
+        // Helper to get current selections for date filters
+        function getSelectedDateFilters() {
+            const form = document.getElementById('filterForm');
+            return {
+                year: form.selectedYear.value,
+                month: form.selectedMonth.value,
+                day: form.selectedDay.value
+            };
+        }
+
+        async function loadDistricts() {
+            try {
+                const res = await fetch('http://localhost:3000/districts');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const districts = await res.json();
+
+                const districtSelect = document.getElementById('district');
+                districtSelect.innerHTML = '<option value="">อำเภอ</option>';
+
+                districts.forEach(d => {
+                    const option = document.createElement('option');
+                    option.value = d.id;
+                    option.textContent = d.name_th;
+                    districtSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading districts:', error);
+                alert('โหลดรายการอำเภอไม่สำเร็จ. กรุณาตรวจสอบคอนโซล.');
+            }
+        }
+
+        async function loadSubdistricts(districtId) {
+            const subdistrictSelect = document.getElementById('subdistrict');
+            subdistrictSelect.innerHTML = '<option value="">ตำบล</option>';
+
+            if (!districtId) {
+                subdistrictSelect.disabled = true;
+                return;
+            }
+
+            subdistrictSelect.disabled = false;
+
+            try {
+                const res = await fetch(`http://localhost:3000/subdistricts?district_id=${districtId}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const subdistricts = await res.json();
+
+                subdistricts.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.id;
+                    option.textContent = s.name_th;
+                    subdistrictSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading subdistricts:', error);
+                alert('โหลดรายการตำบลไม่สำเร็จ. กรุณาตรวจสอบคอนโซล.');
+            }
+        }
+
+        // Refactored: Load Years based on current month/day selections
+        async function loadYears() {
+            const yearSelect = document.getElementById('year');
+            const currentFilters = getSelectedDateFilters();
+            yearSelect.innerHTML = '<option value="">ปี</option>';
+            yearSelect.disabled = true;
+
+            const params = new URLSearchParams();
+            if (currentFilters.month) params.append('month', currentFilters.month);
+            if (currentFilters.day) params.append('day', currentFilters.day);
+
+            try {
+                const res = await fetch(`http://localhost:3000/years-with-data?${params.toString()}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const years = await res.json();
+
+                years.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    yearSelect.appendChild(option);
+                });
+                yearSelect.disabled = false;
+                // Preserve selection if it's still valid
+                if (currentFilters.year && years.includes(parseInt(currentFilters.year))) {
+                    yearSelect.value = currentFilters.year;
+                } else {
+                    yearSelect.value = ""; // Clear if current year is no longer valid
+                }
+            } catch (error) {
+                console.error('Error loading years:', error);
+                alert('โหลดรายการปีไม่สำเร็จ. กรุณาตรวจสอบคอนโซล.');
+            }
+        }
+
+        // Refactored: Load Months based on current year/day selections
+        async function loadMonths() {
+            const monthSelect = document.getElementById('month');
+            const currentFilters = getSelectedDateFilters();
+            monthSelect.innerHTML = '<option value="">เดือน</option>';
+            monthSelect.disabled = true;
+
+            const params = new URLSearchParams();
+            if (currentFilters.year) params.append('year', currentFilters.year);
+            if (currentFilters.day) params.append('day', currentFilters.day);
+
+            try {
+                const res = await fetch(`http://localhost:3000/months-with-data?${params.toString()}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const months = await res.json();
+
+                const monthNames = [
+                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+                ];
+
+                months.forEach(monthNum => {
+                    const option = document.createElement('option');
+                    option.value = monthNum;
+                    option.textContent = monthNames[monthNum - 1];
+                    monthSelect.appendChild(option);
+                });
+                monthSelect.disabled = false;
+                // Preserve selection if it's still valid
+                if (currentFilters.month && months.includes(parseInt(currentFilters.month))) {
+                    monthSelect.value = currentFilters.month;
+                } else {
+                    monthSelect.value = ""; // Clear if current month is no longer valid
+                }
+            } catch (error) {
+                console.error('Error loading months:', error);
+                alert('โหลดรายการเดือนไม่สำเร็จ. กรุณาตรวจสอบคอนโซล.');
+            }
+        }
+
+        // MODIFIED: Load Days based on current year/month selections (now both are optional for fetching)
+        async function loadDays() {
+            const daySelect = document.getElementById('day');
+            const currentFilters = getSelectedDateFilters();
+            daySelect.innerHTML = '<option value="">วัน</option>';
+            daySelect.disabled = true;
+
+            const params = new URLSearchParams();
+            if (currentFilters.year) params.append('year', currentFilters.year);
+            if (currentFilters.month) params.append('month', currentFilters.month);
+
+            try {
+                const res = await fetch(`http://localhost:3000/days-with-data?${params.toString()}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const days = await res.json();
+
+                days.forEach(dayNum => {
+                    const option = document.createElement('option');
+                    option.value = dayNum;
+                    option.textContent = dayNum;
+                    daySelect.appendChild(option);
+                });
+                daySelect.disabled = false;
+                // Preserve selection if it's still valid
+                if (currentFilters.day && days.includes(parseInt(currentFilters.day))) {
+                    daySelect.value = currentFilters.day;
+                } else {
+                    daySelect.value = ""; // Clear if current day is no longer valid
+                }
+            } catch (error) {
+                console.error('Error loading days:', error);
+                alert('โหลดรายการวันไม่สำเร็จ. กรุณาตรวจสอบคอนโซล.');
+            }
+        }
+
+        function getSelectedFilters() {
+            const form = document.getElementById('filterForm');
+            return {
+                district_id: form.district.value,
+                subdistrict_id: form.subdistrict.value,
+                income: Array.from(form.querySelectorAll('input[name="income"]:checked')).map(i => i.value),
+                ageGroups: Array.from(form.querySelectorAll('input[name="ageGroups"]:checked')).map(i => i.value),
+                gender: Array.from(form.querySelectorAll('input[name="gender"]:checked')).map(i => i.value),
+                season: Array.from(form.querySelectorAll('input[name="season"]:checked')).map(i => i.value),
+                selectedYear: form.selectedYear.value,
+                selectedMonth: form.selectedMonth.value,
+                selectedDay: form.selectedDay.value
+            };
+        }
+
+        async function loadChartData() {
+            document.getElementById('summary').innerText = 'กำลังโหลดข้อมูล...';
+            document.getElementById('total-events').innerText = '-';
+
+            try {
+                const res = await fetch('http://localhost:3000/chart-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getSelectedFilters())
+                });
+
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const data = await res.json();
+
+                const labels = [];
+                const lowData = [];
+                const mediumData = [];
+                const highData = [];
+
+                for (const item in data.riskByItem) {
+                    const risk = data.riskByItem[item];
+                    labels.push(item);
+                    lowData.push(risk.low);
+                    mediumData.push(risk.medium);
+                    highData.push(risk.high);
+                }
+
+                if (chart) chart.destroy();
+
+                chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'ความเสี่ยงต่ำ', data: lowData, backgroundColor: '#4CAF50' },
+                            { label: 'ความเสี่ยงปานกลาง', data: mediumData, backgroundColor: '#FFC107' },
+                            { label: 'ความเสี่ยงสูง', data: highData, backgroundColor: '#F44336' }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {},
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'จำนวนคน'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'สรุปความเสี่ยง'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        }
+                    }
+                });
+
+                document.getElementById('summary').innerText =
+                    `ความเสี่ยงต่ำ: ${data.total.low}\nความเสี่ยงปานกลาง: ${data.total.medium}\nความเสี่ยงสูง: ${data.total.high}`;
+                document.getElementById('total-events').innerText =
+                    data.total.low + data.total.medium + data.total.high;
+
+            } catch (error) {
+                console.error("Error loading chart data:", error);
+                alert("ไม่สามารถโหลดข้อมูลกราฟได้. กรุณาตรวจสอบเซิร์ฟเวอร์และคอนโซล.");
+            }
+        }
+
+        // Master function to update all date dropdowns and then chart data
+        async function updateAllDateDropdownsAndChart() {
+            // Store current selections to try and preserve them if valid after updates
+            const currentYearValue = document.getElementById('year').value;
+            const currentMonthValue = document.getElementById('month').value;
+            const currentDayValue = document.getElementById('day').value;
+
+            // Load all three dropdowns based on the current collective state
+            // The order here ensures dependencies are met (e.g., months filtered by year)
+            // but the APIs themselves are flexible.
+            await loadYears();
+            await loadMonths();
+            await loadDays();
+
+            // Attempt to re-select previous values
+            // These will only be re-selected if they are still valid options in the re-populated dropdowns
+            document.getElementById('year').value = currentYearValue;
+            document.getElementById('month').value = currentMonthValue;
+            document.getElementById('day').value = currentDayValue;
+
+            loadChartData(); // Reload chart data after all dropdowns are updated
+        }
+
+        // Event listeners for dropdowns and form changes
+        document.getElementById('district').addEventListener('change', (e) => {
+            loadSubdistricts(e.target.value);
+            loadChartData();
+        });
+
+        document.getElementById('subdistrict').addEventListener('change', loadChartData);
+
+        // Date filter change listeners will now trigger the master update function
+        document.getElementById('year').addEventListener('change', updateAllDateDropdownsAndChart);
+        document.getElementById('month').addEventListener('change', updateAllDateDropdownsAndChart);
+        document.getElementById('day').addEventListener('change', updateAllDateDropdownsAndChart);
+
+        document.getElementById('filterForm').addEventListener('change', (e) => {
+            // Only call loadChartData if the change wasn't from a date or district/subdistrict dropdown,
+            // as those already trigger updateAllDateDropdownsAndChart or loadChartData via their specific listeners.
+            if (!['year', 'month', 'day', 'district', 'subdistrict'].includes(e.target.id)) {
+                loadChartData();
+            }
+        });
+
+        // Initial load when the window is ready
+        window.onload = async () => {
+            await loadDistricts();
+            loadSubdistricts(document.getElementById('district').value);
+            // Initial load of all date dropdowns
+            await updateAllDateDropdownsAndChart(); // Call the master function for initial load
+        };
+    </script>
+</body>
+
+</html>

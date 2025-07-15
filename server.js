@@ -35,6 +35,9 @@ app.get("/index", function (req, res) {
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, "view/login.html"));
 });
+app.get("/chart", function (req, res) {
+  res.sendFile(path.join(__dirname, "view/chart.html"));
+});
 /* app.get('/chiangrai', (req, res) => {
   res.sendFile(path.join(__dirname, "data/chiangrai_districts.geojson"));
 }); */
@@ -91,6 +94,7 @@ app.post('/register', (req, res) => {
 });
 //-------------------map--------------------------------------------------------------
 app.post('/map-data', (req, res) => {
+  
   const {
     year,
     month,
@@ -104,6 +108,7 @@ app.post('/map-data', (req, res) => {
     subdistrict
   } = req.body;
 
+  
   const conditions = [];
   const values = [];
 
@@ -457,6 +462,249 @@ app.get('/api/options/subdistrict', (req, res) => {
     const subdistricts = rows.map(r => r.subdistrict);
     res.json(subdistricts);
   });
+});
+//------------------------------------------Chart-------------------------------------------------------------
+app.get('/districts', (req, res) => {
+    const sql = 'SELECT id, name_th FROM district ORDER BY name_th ASC'; // Order by name for better UX
+    con.query(sql, (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for districts:', err.message);
+            return res.status(500).json({ error: 'Failed to load districts.' });
+        }
+        res.json(rows);
+    });
+});
+
+// API to load subdistricts based on district_id
+app.get('/subdistricts', (req, res) => {
+    const { district_id } = req.query; // Get district_id from query parameters
+    if (!district_id) {
+        // Return an empty array or a clear error if district_id is missing
+        return res.status(400).json({ error: 'district_id is required.' });
+    }
+
+    const sql = 'SELECT id, name_th FROM sub_district WHERE district_id = ? ORDER BY name_th ASC';
+    con.query(sql, [district_id], (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for subdistricts:', err.message);
+            return res.status(500).json({ error: 'Failed to load subdistricts.' });
+        }
+        res.json(rows);
+    });
+});
+
+// UPDATED API: Get distinct years based on optional month and day filters
+app.get('/years-with-data', (req, res) => {
+    const { month, day } = req.query;
+    const conditions = ['birth_date IS NOT NULL'];
+    const values = [];
+
+    if (month) {
+        conditions.push('MONTH(birth_date) = ?');
+        values.push(month);
+    }
+    if (day) {
+        conditions.push('DAY(birth_date) = ?');
+        values.push(day);
+    }
+
+    const sql = `SELECT DISTINCT YEAR(birth_date) AS year FROM person WHERE ${conditions.join(' AND ')} ORDER BY year DESC`;
+    con.query(sql, values, (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for years:', err.message);
+            return res.status(500).json({ error: 'Failed to load years.' });
+        }
+        res.json(rows.map(row => row.year));
+    });
+});
+
+// UPDATED API: Get distinct months for a given year and optional day filter
+app.get('/months-with-data', (req, res) => {
+    const { year, day } = req.query;
+    const conditions = ['birth_date IS NOT NULL'];
+    const values = [];
+
+    if (year) {
+        conditions.push('YEAR(birth_date) = ?');
+        values.push(year);
+    }
+    if (day) {
+        conditions.push('DAY(birth_date) = ?');
+        values.push(day);
+    }
+
+    // If no specific year or day is provided, the conditions array will only have 'birth_date IS NOT NULL'
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `SELECT DISTINCT MONTH(birth_date) AS month FROM person ${whereClause} ORDER BY month ASC`;
+    
+    con.query(sql, values, (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for months:', err.message);
+            return res.status(500).json({ error: 'Failed to load months.' });
+        }
+        res.json(rows.map(row => row.month));
+    });
+});
+
+// MODIFIED API: Get distinct days for a given year and month (now both are optional)
+app.get('/days-with-data', (req, res) => {
+    const { year, month } = req.query;
+    const conditions = ['birth_date IS NOT NULL']; // Base condition
+    const values = [];
+
+    if (year) {
+        conditions.push('YEAR(birth_date) = ?');
+        values.push(year);
+    }
+    if (month) {
+        conditions.push('MONTH(birth_date) = ?');
+        values.push(month);
+    }
+
+    // Construct the WHERE clause. If only 'birth_date IS NOT NULL' is there, it's just 'WHERE birth_date IS NOT NULL'
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `SELECT DISTINCT DAY(birth_date) AS day FROM person ${whereClause} ORDER BY day ASC`;
+    
+    con.query(sql, values, (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for days:', err.message);
+            return res.status(500).json({ error: 'Failed to load days.' });
+        }
+        res.json(rows.map(row => row.day));
+    });
+});
+
+// POST /chart-data to receive filters from client and return aggregated data
+app.post('/chart-data', (req, res) => {
+    const {
+        district_id,
+        subdistrict_id,
+        income,
+        ageGroups,
+        gender,
+        season,
+        selectedYear, // New date filter
+        selectedMonth, // New date filter
+        selectedDay // New date filter
+    } = req.body || {};
+
+    const conditions = [];
+    const values = [];
+
+    // Add conditions for each filter if present and not empty
+    if (district_id && district_id !== "") {
+        conditions.push('p.district_id = ?');
+        values.push(district_id);
+    }
+
+    if (subdistrict_id && subdistrict_id !== "") {
+        conditions.push('p.subdistrict_id = ?');
+        values.push(subdistrict_id);
+    }
+
+    // Handle array-based filters using IN clause
+    if (income && income.length > 0) {
+        conditions.push(`p.monthly_income IN (${income.map(() => '?').join(',')})`);
+        values.push(...income);
+    }
+
+    if (ageGroups && ageGroups.length > 0) {
+        conditions.push(`p.age_range IN (${ageGroups.map(() => '?').join(',')})`);
+        values.push(...ageGroups);
+    }
+
+    if (gender && gender.length > 0) {
+        conditions.push(`p.gender IN (${gender.map(() => '?').join(',')})`);
+        values.push(...gender);
+    }
+
+    if (season && season.length > 0) {
+        conditions.push(`p.season IN (${season.map(() => '?').join(',')})`);
+        values.push(...season);
+    }
+
+    // New date filters based on birth_date
+    if (selectedYear && selectedYear !== "") {
+        conditions.push('YEAR(p.birth_date) = ?');
+        values.push(selectedYear);
+    }
+    if (selectedMonth && selectedMonth !== "") {
+        conditions.push('MONTH(p.birth_date) = ?');
+        values.push(selectedMonth);
+    }
+    if (selectedDay && selectedDay !== "") {
+        conditions.push('DAY(p.birth_date) = ?');
+        values.push(selectedDay);
+    }
+
+    // Construct the WHERE clause
+    // Always include 'p.predict IS NOT NULL' as a base condition
+    const baseCondition = 'p.predict IS NOT NULL';
+    const whereClause = conditions.length > 0 ? `WHERE ${baseCondition} AND ` + conditions.join(' AND ') : `WHERE ${baseCondition}`;
+
+    let selectClause = '';
+    let groupByClause = '';
+    let joinClause = '';
+    let orderByName = '';
+    let nameField = '';
+
+    // Dynamically adjust GROUP BY and SELECT based on filters
+    if (district_id && !subdistrict_id) {
+        // If a district is selected but no subdistrict, group by subdistricts for that district
+        selectClause = 'sd.name_th AS item_name';
+        joinClause = 'JOIN sub_district sd ON p.subdistrict_id = sd.id';
+        groupByClause = 'GROUP BY p.subdistrict_id';
+        orderByName = 'ORDER BY sd.name_th ASC';
+        nameField = 'item_name';
+    } else {
+        // Otherwise (no district, or district AND subdistrict, or just subdistrict), group by districts
+        selectClause = 'd.name_th AS item_name';
+        joinClause = 'JOIN district d ON p.district_id = d.id';
+        groupByClause = 'GROUP BY p.district_id';
+        orderByName = 'ORDER BY d.name_th ASC';
+        nameField = 'item_name';
+    }
+
+    // SQL query to aggregate risk data
+    const sql = `
+        SELECT
+            ${selectClause},
+            SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high,
+            SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
+            SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low
+        FROM person p
+        ${joinClause}
+        ${whereClause}
+        ${groupByClause}
+        ${orderByName}
+    `;
+
+    con.query(sql, values, (err, rows) => {
+        if (err) {
+            console.error('❌ MySQL query error for chart data:', err.message);
+            return res.status(500).json({ error: 'Failed to load chart data.' });
+        }
+
+        const riskByItem = {};
+        let total_high = 0, total_medium = 0, total_low = 0;
+
+        rows.forEach(row => {
+            const low = Number(row.count_low || 0);
+            const medium = Number(row.count_medium || 0);
+            const high = Number(row.count_high || 0);
+
+            total_low += low;
+            total_medium += medium;
+            total_high += high;
+
+            riskByItem[row[nameField].trim()] = { low, medium, high };
+        });
+
+        res.json({
+            riskByItem,
+            total: { high: total_high, medium: total_medium, low: total_low }
+        });
+    });
 });
 
 //----------------------------------------------------------UPLOAD----------------------------------------------------------

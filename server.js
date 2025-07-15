@@ -145,20 +145,20 @@ app.post('/map-data', (req, res) => {
     conditions.push(`DAY(p.birth_date) = ?`);
     values.push(date);
   }
-if (district && district !== 'none' && district !== 'อำเภอ') {
-  conditions.push('d.name_th = ?');
-  values.push(district);
-}
+  if (district && district !== 'none' && district !== 'อำเภอ') {
+    conditions.push('d.name_th = ?');
+    values.push(district);
+  }
 
-if (subdistrict && subdistrict !== 'none' && subdistrict !== 'ตำบล') {
-  conditions.push('s.name_th = ?');
-  values.push(subdistrict);
-}
+  if (subdistrict && subdistrict !== 'none' && subdistrict !== 'ตำบล') {
+    conditions.push('s.name_th = ?');
+    values.push(subdistrict);
+  }
 
 
   const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
 
-const sql = `
+  const sql = `
   SELECT 
     d.name_th AS district_name,
     SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
@@ -357,51 +357,73 @@ app.post('/subdistrict-map-data', (req, res) => {
 });
 
 //------------------------------------------SELECT-------------------------------------------------------------
-app.get('/api/options/month', (req, res) => {
-  const sql = `
-    SELECT DISTINCT MONTH(birth_date) AS month
-    FROM person
-    WHERE birth_date IS NOT NULL
-    ORDER BY month ASC
-  `;
-  con.query(sql, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    const months = rows.map(r => r.month); // ✅ [1,2,...12]
-    res.json(months);
-  });
-});
-//------------------------------------------SELECT year-------------------------------------------------------------
+// helper สร้างเงื่อนไข WHERE ตาม param ที่ส่งมา
+function buildDateConditions(query) {
+  const conditions = [];
+  const values = [];
+
+  if (query.year) {
+    conditions.push(`YEAR(birth_date) = ?`);
+    values.push(query.year);
+  }
+  if (query.month) {
+    conditions.push(`MONTH(birth_date) = ?`);
+    values.push(query.month);
+  }
+  if (query.day) {
+    conditions.push(`DAY(birth_date) = ?`);
+    values.push(query.day);
+  }
+
+  return { conditions, values };
+}
+
 app.get('/api/options/year', (req, res) => {
-  const sql = `
-    SELECT DISTINCT YEAR(birth_date) AS year
-    FROM person
-    WHERE birth_date IS NOT NULL
-    ORDER BY year DESC
-  `;
+  const { conditions, values } = buildDateConditions(req.query);
 
-  con.query(sql, (err, rows) => {
+  let sql = `SELECT DISTINCT YEAR(birth_date) AS year FROM person WHERE birth_date IS NOT NULL`;
+  if (conditions.length) {
+    sql += ' AND ' + conditions.join(' AND ');
+  }
+  sql += ` ORDER BY year ASC`;
+
+  con.query(sql, values, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-
-    const years = rows.map(row => row.year);
-    res.json(years); // ✅ ต้องเป็น JSON
+    res.json(rows.map(r => r.year));
   });
 });
-//------------------------------------------SELECT days-------------------------------------------------------------
+
+app.get('/api/options/month', (req, res) => {
+  const { conditions, values } = buildDateConditions(req.query);
+
+  let sql = `SELECT DISTINCT MONTH(birth_date) AS month FROM person WHERE birth_date IS NOT NULL`;
+  if (conditions.length) {
+    sql += ' AND ' + conditions.join(' AND ');
+  }
+  sql += ` ORDER BY month ASC`;
+
+  con.query(sql, values, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows.map(r => r.month));
+  });
+});
+
 app.get('/api/options/day', (req, res) => {
-  const sql = `
-    SELECT DISTINCT DAY(birth_date) AS DAY
-    FROM person
-    WHERE birth_date IS NOT NULL
-    ORDER BY DAY DESC
-  `;
+  const { conditions, values } = buildDateConditions(req.query);
 
-  con.query(sql, (err, rows) => {
+  let sql = `SELECT DISTINCT DAY(birth_date) AS day FROM person WHERE birth_date IS NOT NULL`;
+  if (conditions.length) {
+    sql += ' AND ' + conditions.join(' AND ');
+  }
+  sql += ` ORDER BY day ASC`;
+
+  con.query(sql, values, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-
-    const days = rows.map(row => row.DAY);
-    res.json(days); // ✅ ต้องเป็น JSON
+    res.json(rows.map(r => r.day));
   });
 });
+
+
 //------------------------------------------SELECT district-------------------------------------------------------------
 app.get('/api/options/district', (req, res) => {
   const sql = `
@@ -463,9 +485,9 @@ app.post('/upload', upload.single('csvFile'), (req, res) => {
       // กรองเอาแค่จังหวัดเชียงราย
       results = results.filter(row => row['Pro.จังหวัด'] === 'จ.เชียงราย');
 
-if (results.length === 0) {
-  return res.json({ status: 'no_data', message: 'ไม่พบข้อมูลจังหวัดเชียงรายในไฟล์ที่อัปโหลด' });
-}
+      if (results.length === 0) {
+        return res.json({ status: 'no_data', message: 'ไม่พบข้อมูลจังหวัดเชียงรายในไฟล์ที่อัปโหลด' });
+      }
 
       // ฟังก์ชันแปลงข้อมูล
       function combine_income(row) {
@@ -508,162 +530,162 @@ if (results.length === 0) {
         return parts.length ? parts.join(' / ') : "ไม่ระบุ";
       }
 
-      function combine_income2(row){
+      function combine_income2(row) {
         const income = {
-          
+
         }
       }
 
       function combine_district_from_string(row) {
-  const map = {
-    'อ.เมืองเชียงราย': 1,
-    'อ.เวียงชัย': 2,
-    'อ.เชียงของ': 3,
-    'อ.เทิง': 4,
-    'อ.พาน': 5,
-    'อ.ป่าแดด': 6,
-    'อ.แม่จัน': 7,
-    'อ.เชียงแสน': 8,
-    'อ.แม่สาย': 9,
-    'อ.แม่สรวย': 10,
-    'อ.เวียงป่าเป้า': 11,
-    'อ.พญาเม็งราย': 12,
-    'อ.เวียงแก่น': 13,
-    'อ.ขุนตาล': 14,
-    'อ.แม่ฟ้าหลวง': 15,
-    'อ.แม่ลาว': 16,
-    'อ.เวียงเชียงรุ้ง': 17,
-    'อ.ดอยหลวง': 18,
-  };
-  const name = row['Pro.อำเภอ / เขต']?.trim();
-  return map[name] || null;
-}
+        const map = {
+          'อ.เมืองเชียงราย': 1,
+          'อ.เวียงชัย': 2,
+          'อ.เชียงของ': 3,
+          'อ.เทิง': 4,
+          'อ.พาน': 5,
+          'อ.ป่าแดด': 6,
+          'อ.แม่จัน': 7,
+          'อ.เชียงแสน': 8,
+          'อ.แม่สาย': 9,
+          'อ.แม่สรวย': 10,
+          'อ.เวียงป่าเป้า': 11,
+          'อ.พญาเม็งราย': 12,
+          'อ.เวียงแก่น': 13,
+          'อ.ขุนตาล': 14,
+          'อ.แม่ฟ้าหลวง': 15,
+          'อ.แม่ลาว': 16,
+          'อ.เวียงเชียงรุ้ง': 17,
+          'อ.ดอยหลวง': 18,
+        };
+        const name = row['Pro.อำเภอ / เขต']?.trim();
+        return map[name] || null;
+      }
 
       function combine_subdistrict(row) {
         const subdistrict_map = {
-    'ต.เวียง': 101,
-    'ต.รอบเวียง': 102,
-    'ต.บ้านดู่': 103,
-    'ต.นางแล': 104,
-    'ต.แม่ข้าวต้ม': 105,
-    'ต.แม่ยาว': 106,
-    'ต.สันทราย': 107,
-    'ต.แม่กรณ์': 108,
-    'ต.ห้วยชมภู': 109,
-    'ต.ห้วยสัก': 110,
-    'ต.ริมกก': 111,
-    'ต.ดอยลาน': 112,
-    'ต.ป่าอ้อดอนชัย': 113,
-    'ต.ท่าสาย': 114,
-    'ต.ดอยฮาง': 115,
-    'ต.ท่าสุด': 116,
-    'ต.เวียงชัย': 201,
-    'ต.ผางาม': 202,
-    'ต.เวียงเหนือ': 203,
-    'ต.ดอนศิลา': 204,
-    'ต.เมืองชุม': 205,
-    'ต.สถาน': 302,
-    'ต.ครึ่ง': 303,
-    'ต.บุญเรือง': 304,
-    'ต.ห้วยซ้อ': 305,
-    'ต.ศรีดอนชัย': 306,
-    'ต.ริมโขง': 307,
-    'ต.งิ้ว': 402,
-    'ต.ปล้อง': 403,
-    'ต.แม่ลอย': 404,
-    'ต.เชียงเคี่ยน': 405,
-    'ต.ตับเต่า': 406,
-    'ต.หงาว': 407,
-    'ต.สันทรายงาม': 408,
-    'ต.ศรีดอนไชย': 409,
-    'ต.หนองแรด': 410,
-    'ต.สันมะเค็ด': 501,
-    'ต.แม่อ้อ': 502,
-    'ต.ธารทอง': 503,
-    'ต.สันติสุข': 504,
-    'ต.ดอยงาม': 505,
-    'ต.หัวง้ม': 506,
-    'ต.เจริญเมือง': 507,
-    'ต.ป่าหุ่ง': 508,
-    'ต.ม่วงคำ': 509,
-    'ต.ทรายขาว': 510,
-    'ต.สันกลาง': 511,
-    'ต.แม่เย็น': 512,
-    'ต.เมืองพาน': 513,
-    'ต.ทานตะวัน': 514,
-    'ต.เวียงห้าว': 515,
-    'ต.ป่าแดด': 601,
-    'ต.ป่าแงะ': 602,
-    'ต.สันมะค่า': 603,
-    'ต.โรงช้าง': 604,
-    'ต.ศรีโพธิ์เงิน': 605,
-    'ต.แม่จัน': 701,
-    'ต.จันจว้า': 702,
-    'ต.แม่คำ': 703,
-    'ต.ป่าซาง': 704,
-    'ต.สันทราย': 705,
-    'ต.ท่าข้าวเปลือก': 706,
-    'ต.ป่าตึง': 707,
-    'ต.แม่ไร่': 708,
-    'ต.ศรีค้ำ': 709,
-    'ต.จันจว้าใต้': 710,
-    'ต.จอมสวรรค์': 711,
-    'ต.ป่าสัก': 802,
-    'ต.บ้านแซว': 803,
-    'ต.ศรีดอนมูล': 804,
-    'ต.แม่เงิน': 805,
-    'ต.โยนก': 806,
-    'ต.แม่สาย': 901,
-    'ต.ห้วยไคร้': 902,
-    'ต.เกาะช้าง': 903,
-    'ต.โป่งผา': 904,
-    'ต.ศรีเมืองชุม': 905,
-    'ต.เวียงพางคำ': 906,
-    'ต.บ้านด้าย': 907,
-    'ต.โป่งงาม': 908,
-    'ต.แม่สรวย': 1001,
-    'ต.แม่พริก': 1003,
-    'ต.ศรีถ้อย': 1004,
-    'ต.ท่าก๊อ': 1005,
-    'ต.วาวี': 1006,
-    'ต.เจดีย์หลวง': 1007,
-    'ต.สันสลี': 1101,
-    'ต.บ้านโป่ง': 1103,
-    'ต.ป่างิ้ว': 1104,
-    'ต.เวียงกาหลง': 1105,
-    'ต.แม่เจดีย์': 1106,
-    'ต.แม่เจดีย์ใหม่': 1107,
-    'ต.แม่เปา': 1201,
-    'ต.แม่ต๋ำ': 1202,
-    'ต.ไม้ยา': 1203,
-    'ต.เม็งราย': 1204,
-    'ต.ตาดควัน': 1205,
-    'ต.ม่วงยาย': 1301,
-    'ต.ปอ': 1302,
-    'ต.หล่ายงาว': 1303,
-    'ต.ท่าข้าม': 1304,
-    'ต.ต้า': 1401,
-    'ต.ป่าตาล': 1402,
-    'ต.ยางฮอม': 1403,
-    'ต.เทอดไทย': 1501,
-    'ต.แม่สลองใน': 1502,
-    'ต.แม่สลองนอก': 1503,
-    'ต.แม่ฟ้าหลวง': 1504,
-    'ต.ดงมะดะ': 1601,
-    'ต.จอมหมอกแก้ว': 1602,
-    'ต.บัวสลี': 1603,
-    'ต.ป่าก่อดำ': 1604,
-    'ต.โป่งแพร่': 1605,
-    'ต.ทุ่งก่อ': 1701,
-    'ต.ดงมหาวัน': 1702,
-    'ต.ปงน้อย': 1801,
-    'ต.โชคชัย': 1802,
-    'ต.หนองป่าก่อ': 1803,
-}
-         const name = row["Pro.ตำบล / แขวง"]?.trim();
-      return subdistrict_map[name] || null;
-   }
-      
+          'ต.เวียง': 101,
+          'ต.รอบเวียง': 102,
+          'ต.บ้านดู่': 103,
+          'ต.นางแล': 104,
+          'ต.แม่ข้าวต้ม': 105,
+          'ต.แม่ยาว': 106,
+          'ต.สันทราย': 107,
+          'ต.แม่กรณ์': 108,
+          'ต.ห้วยชมภู': 109,
+          'ต.ห้วยสัก': 110,
+          'ต.ริมกก': 111,
+          'ต.ดอยลาน': 112,
+          'ต.ป่าอ้อดอนชัย': 113,
+          'ต.ท่าสาย': 114,
+          'ต.ดอยฮาง': 115,
+          'ต.ท่าสุด': 116,
+          'ต.เวียงชัย': 201,
+          'ต.ผางาม': 202,
+          'ต.เวียงเหนือ': 203,
+          'ต.ดอนศิลา': 204,
+          'ต.เมืองชุม': 205,
+          'ต.สถาน': 302,
+          'ต.ครึ่ง': 303,
+          'ต.บุญเรือง': 304,
+          'ต.ห้วยซ้อ': 305,
+          'ต.ศรีดอนชัย': 306,
+          'ต.ริมโขง': 307,
+          'ต.งิ้ว': 402,
+          'ต.ปล้อง': 403,
+          'ต.แม่ลอย': 404,
+          'ต.เชียงเคี่ยน': 405,
+          'ต.ตับเต่า': 406,
+          'ต.หงาว': 407,
+          'ต.สันทรายงาม': 408,
+          'ต.ศรีดอนไชย': 409,
+          'ต.หนองแรด': 410,
+          'ต.สันมะเค็ด': 501,
+          'ต.แม่อ้อ': 502,
+          'ต.ธารทอง': 503,
+          'ต.สันติสุข': 504,
+          'ต.ดอยงาม': 505,
+          'ต.หัวง้ม': 506,
+          'ต.เจริญเมือง': 507,
+          'ต.ป่าหุ่ง': 508,
+          'ต.ม่วงคำ': 509,
+          'ต.ทรายขาว': 510,
+          'ต.สันกลาง': 511,
+          'ต.แม่เย็น': 512,
+          'ต.เมืองพาน': 513,
+          'ต.ทานตะวัน': 514,
+          'ต.เวียงห้าว': 515,
+          'ต.ป่าแดด': 601,
+          'ต.ป่าแงะ': 602,
+          'ต.สันมะค่า': 603,
+          'ต.โรงช้าง': 604,
+          'ต.ศรีโพธิ์เงิน': 605,
+          'ต.แม่จัน': 701,
+          'ต.จันจว้า': 702,
+          'ต.แม่คำ': 703,
+          'ต.ป่าซาง': 704,
+          'ต.สันทราย': 705,
+          'ต.ท่าข้าวเปลือก': 706,
+          'ต.ป่าตึง': 707,
+          'ต.แม่ไร่': 708,
+          'ต.ศรีค้ำ': 709,
+          'ต.จันจว้าใต้': 710,
+          'ต.จอมสวรรค์': 711,
+          'ต.ป่าสัก': 802,
+          'ต.บ้านแซว': 803,
+          'ต.ศรีดอนมูล': 804,
+          'ต.แม่เงิน': 805,
+          'ต.โยนก': 806,
+          'ต.แม่สาย': 901,
+          'ต.ห้วยไคร้': 902,
+          'ต.เกาะช้าง': 903,
+          'ต.โป่งผา': 904,
+          'ต.ศรีเมืองชุม': 905,
+          'ต.เวียงพางคำ': 906,
+          'ต.บ้านด้าย': 907,
+          'ต.โป่งงาม': 908,
+          'ต.แม่สรวย': 1001,
+          'ต.แม่พริก': 1003,
+          'ต.ศรีถ้อย': 1004,
+          'ต.ท่าก๊อ': 1005,
+          'ต.วาวี': 1006,
+          'ต.เจดีย์หลวง': 1007,
+          'ต.สันสลี': 1101,
+          'ต.บ้านโป่ง': 1103,
+          'ต.ป่างิ้ว': 1104,
+          'ต.เวียงกาหลง': 1105,
+          'ต.แม่เจดีย์': 1106,
+          'ต.แม่เจดีย์ใหม่': 1107,
+          'ต.แม่เปา': 1201,
+          'ต.แม่ต๋ำ': 1202,
+          'ต.ไม้ยา': 1203,
+          'ต.เม็งราย': 1204,
+          'ต.ตาดควัน': 1205,
+          'ต.ม่วงยาย': 1301,
+          'ต.ปอ': 1302,
+          'ต.หล่ายงาว': 1303,
+          'ต.ท่าข้าม': 1304,
+          'ต.ต้า': 1401,
+          'ต.ป่าตาล': 1402,
+          'ต.ยางฮอม': 1403,
+          'ต.เทอดไทย': 1501,
+          'ต.แม่สลองใน': 1502,
+          'ต.แม่สลองนอก': 1503,
+          'ต.แม่ฟ้าหลวง': 1504,
+          'ต.ดงมะดะ': 1601,
+          'ต.จอมหมอกแก้ว': 1602,
+          'ต.บัวสลี': 1603,
+          'ต.ป่าก่อดำ': 1604,
+          'ต.โป่งแพร่': 1605,
+          'ต.ทุ่งก่อ': 1701,
+          'ต.ดงมหาวัน': 1702,
+          'ต.ปงน้อย': 1801,
+          'ต.โชคชัย': 1802,
+          'ต.หนองป่าก่อ': 1803,
+        }
+        const name = row["Pro.ตำบล / แขวง"]?.trim();
+        return subdistrict_map[name] || null;
+      }
+
 
       function combine_birth_date(row) {
         const y = parseInt(row['ปี']);
@@ -756,40 +778,40 @@ if (results.length === 0) {
         // protective_factors: row['การสร้างและเสริมปัจจัยปกป้อง ระดับบุคคลและระดับครอบครัว'] || 0,
         // ongoing_support: row['การติดตามช่วยเหลือต่อเนื่องป้องกันการกระทำรุนแรงต่อตนเองซ้ำ'] || 0,
       }));
-      
-      
+
+
 
       // อัปเดตฐานข้อมูลทีละแถว
       results.forEach(row => {
-  const sql = `
+        const sql = `
     INSERT INTO person
       (gender, marital_status, monthly_income, season, age_range, district_id, subdistrict_id, birth_date, province_id, predict)
     VALUES
       (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  const values = [
-    row.gender, row.marital_status, row.monthly_income, row.season, row.age_range,
-    row.district_id, row.subdistrict_id, row.birth_date, row.province_id, row.predict,
-  ];
+        const values = [
+          row.gender, row.marital_status, row.monthly_income, row.season, row.age_range,
+          row.district_id, row.subdistrict_id, row.birth_date, row.province_id, row.predict,
+        ];
 
-  if (values.length !== 10) {
-    console.error(`Error: values count mismatch, got ${values.length} values but expected 10`);
-    return;
-  }
+        if (values.length !== 10) {
+          console.error(`Error: values count mismatch, got ${values.length} values but expected 10`);
+          return;
+        }
 
-  con.query(sql, values, (err, result) => {
-    if (err) {
-      console.error('DB Insert Error:', err);
-    }
-  });
-});
+        con.query(sql, values, (err, result) => {
+          if (err) {
+            console.error('DB Insert Error:', err);
+          }
+        });
+      });
 
-      
+
       console.log("parsed results:", results);
       res.json({ status: 'success', inserted: results.length });
     } catch (e) {
-    
+
       console.error('Parse Error:', e);
       res.status(500).json({ status: 'error', message: 'Failed to process data.' });
     }

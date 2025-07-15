@@ -166,76 +166,89 @@
             legend.addTo(map);
             levelControl.addTo(map);
             //-----------------------------------------------------select years---------------------------------------
-            async function loadYearOptions() {
-                try {
-                    const res = await fetch('http://localhost:3000/api/options/year');
-                    const years = await res.json();
-                    const select = document.getElementById('year');
-                    select.innerHTML = '<option value="">ปี</option>';
-                    years.forEach(year => {
-                        const option = document.createElement('option');
-                        option.value = year;
-                        option.textContent = year;
-                        select.appendChild(option);
-                    });
+            async function loadYearOptions(filter) {
+                let url = 'http://localhost:3000/api/options/year';
+                const params = [];
+                if (filter.month) params.push(`month=${encodeURIComponent(filter.month)}`);
+                if (filter.day) params.push(`day=${encodeURIComponent(filter.day)}`);
+                if (params.length) url += '?' + params.join('&');
 
-                } catch (err) {
-                    console.error('โหลดปีไม่สำเร็จ:', err);
-                }
+                const res = await fetch(url);
+                const years = await res.json();
+                const select = document.getElementById('year');
+                const oldValue = select.value;
+
+                select.innerHTML = '<option value="">ปี</option>';
+                years.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    select.appendChild(option);
+                });
+
+                if (oldValue && years.includes(parseInt(oldValue))) select.value = oldValue;
+                else select.value = '';
             }
+
             //-----------------------------------------------------select month---------------------------------------
-            async function loadMonthOptions() {
-                try {
-                    const res = await fetch('http://localhost:3000/api/options/month');
-                    const months = await res.json(); // เช่น [1, 2, 3, ..., 12]
-                    const select = document.getElementById('month');
-                    select.innerHTML = '<option value="">เดือน</option>';
-                    const monthMap = {
-                        1: 'มกราคม',
-                        2: 'กุมภาพันธ์',
-                        3: 'มีนาคม',
-                        4: 'เมษายน',
-                        5: 'พฤษภาคม',
-                        6: 'มิถุนายน',
-                        7: 'กรกฎาคม',
-                        8: 'สิงหาคม',
-                        9: 'กันยายน',
-                        10: 'ตุลาคม',
-                        11: 'พฤศจิกายน',
-                        12: 'ธันวาคม'
-                    };
+            async function loadMonthOptions(filter) {
+                let url = 'http://localhost:3000/api/options/month';
+                const params = [];
+                if (filter.year) params.push(`year=${encodeURIComponent(filter.year)}`);
+                if (filter.day) params.push(`day=${encodeURIComponent(filter.day)}`);
+                if (params.length) url += '?' + params.join('&');
 
-                    months.forEach(monthNum => {
-                        const option = document.createElement('option');
-                        option.value = monthNum; // ✅ ส่งตัวเลข
-                        option.textContent = monthMap[monthNum]; // ✅ แสดงชื่อไทย
-                        select.appendChild(option);
-                    });
+                const res = await fetch(url);
+                const months = await res.json();
+                const select = document.getElementById('month');
+                const oldValue = select.value;
 
-                } catch (err) {
-                    console.error('โหลดเดือนไม่สำเร็จ:', err);
-                }
+                select.innerHTML = '<option value="">เดือน</option>';
+                const monthMap = {
+                    1: 'มกราคม', 2: 'กุมภาพันธ์', 3: 'มีนาคม', 4: 'เมษายน',
+                    5: 'พฤษภาคม', 6: 'มิถุนายน', 7: 'กรกฎาคม', 8: 'สิงหาคม',
+                    9: 'กันยายน', 10: 'ตุลาคม', 11: 'พฤศจิกายน', 12: 'ธันวาคม'
+                };
+                months.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.textContent = monthMap[m];
+                    select.appendChild(option);
+                });
+
+                if (oldValue && months.includes(parseInt(oldValue))) select.value = oldValue;
+                else select.value = '';
             }
+
+
 
 
             //-----------------------------------------------------select date---------------------------------------
-            async function loadDayOptions() {
-                try {
-                    const res = await fetch('http://localhost:3000/api/options/day');
-                    const days = await res.json();
-                    const select = document.getElementById('date');
-                    select.innerHTML = '<option value="">วัน</option>';
-                    days.forEach(date => {
-                        const option = document.createElement('option');
-                        option.value = date;
-                        option.textContent = date;
-                        select.appendChild(option);
-                    });
+            async function loadDayOptions(filter) {
+                let url = 'http://localhost:3000/api/options/day';
+                const params = [];
+                if (filter.year) params.push(`year=${encodeURIComponent(filter.year)}`);
+                if (filter.month) params.push(`month=${encodeURIComponent(filter.month)}`);
+                if (params.length) url += '?' + params.join('&');
 
-                } catch (err) {
-                    console.error('โหลดวันไม่สำเร็จ:', err);
-                }
+                const res = await fetch(url);
+                const days = await res.json();
+                const select = document.getElementById('date');
+                const oldValue = select.value;
+
+                select.innerHTML = '<option value="">วัน</option>';
+                days.forEach(d => {
+                    const option = document.createElement('option');
+                    option.value = d;
+                    option.textContent = d;
+                    select.appendChild(option);
+                });
+
+                if (oldValue && days.includes(parseInt(oldValue))) select.value = oldValue;
+                else select.value = '';
             }
+
+
             //-----------------------------------------------------select district---------------------------------------
 
             async function loadDistrictOptions() {
@@ -343,7 +356,7 @@
                         if (subdistrict === normalizeName(subdistrictName)) {
                             const bounds = layer.getBounds();
                             map.fitBounds(bounds);
-                           // layer.openPopup();
+                            // layer.openPopup();
                         }
                     }
                 }).addTo(map);
@@ -364,29 +377,51 @@
                 }
             });
 
+async function updateDateDropdowns() {
+    const filter = {
+        year: document.getElementById('year').value || null,
+        month: document.getElementById('month').value || null,
+        day: document.getElementById('date').value || null
+    };
+
+    // เรียกโหลด dropdown ทั้ง 3 ตัวพร้อมกัน
+    await Promise.all([
+        loadYearOptions(filter),
+        loadMonthOptions(filter),
+        loadDayOptions(filter),
+        loadDistrictOptions()
+    ]);
+
+    // โหลดแผนที่หรือข้อมูลอื่น ๆ ตาม filter ที่อัปเดต
+    updateMap();
+}
+['year', 'month', 'date'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('change', () => {
+        updateDateDropdowns();
+    });
+});
 
 
 
 
+window.addEventListener('DOMContentLoaded', () => {
+  // เรียก load dropdown ครั้งแรก
+  updateDateDropdowns();
+
+  // เพิ่ม listener ให้ dropdown ทั้ง 3
+  ['year', 'month', 'date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        updateDateDropdowns();
+      });
+    }
+  });
+});
 
 
-            window.addEventListener('DOMContentLoaded', () => {
-                loadYearOptions();
-                loadMonthOptions();
-                loadDayOptions();
-                loadDistrictOptions();
 
-                // ใส่แค่ listener สำหรับปี เดือน วัน และ checkbox เท่านั้น
-                ['year', 'month', 'date'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        el.addEventListener('change', () => {
-                            updateMap();
-                        });
-                    }
-                });
-
-            });
 
 
 

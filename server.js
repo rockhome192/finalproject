@@ -38,6 +38,9 @@ app.get('/login', (req, res) => {
 app.get("/chart", function (req, res) {
   res.sendFile(path.join(__dirname, "view/chart.html"));
 });
+app.get("/table", function (req, res) {
+  res.sendFile(path.join(__dirname, "view/table.html"));
+});
 /* app.get('/chiangrai', (req, res) => {
   res.sendFile(path.join(__dirname, "data/chiangrai_districts.geojson"));
 }); */

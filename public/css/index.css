@@ -1,85 +1,129 @@
-  body {
-    margin: 0;
-    font-family: "Sarabun", sans-serif;
-    background-color: #8bb57b;
-    /* สีพื้นหลังเขียว */
-  }
-
-  header {
-    text-align: right;
-    margin: 10px;
-
-    .top-buttons-information {
-      color: black;
-      border: none;
-      outline: none;
-      border-radius: 40px;
-      width: 100px;
-      height: 40px;
-      
-    }
-
-  }
-
-  .container {
-    max-width: 1100px;
-    margin: 20px auto;
-    padding: 10px;
-    background-color: #8bb57b;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    justify-content: center;
+@import
+url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display
+=swap');
+* {
+ margin: 0;
+ padding: 0;
+ box-sizing: border-box;
+ font-family: 'Poppins', sans-serif;
 }
-
+body {
+ background: linear-gradient(135deg, #A8E6CF, #DCE775);
+ min-height: 100vh;
+ padding: 20px;
+ font-size: 16px;
+}
+header {
+ text-align: right;
+ margin-bottom: 20px;
+}
+.top-buttons-information {
+ background-color: white;
+ color: #2e7d32;
+ border: none;
+ border-radius: 30px;
+ padding: 10px 20px;
+ font-weight: 600;
+ cursor: pointer;
+ transition: background-color 0.3s ease;
+}
+.top-buttons-information:hover {
+ background-color: #e0ffe2;
+}
+.container {
+ max-width: 1200px;
+ margin: 0 auto;
+ padding: 20px;
+ display: flex;
+ flex-wrap: wrap;
+ gap: 20px;
+ justify-content: center;
+}
 .sidebar {
-    width: 300px;
-    background-color: #c5e2a1;
-    border-radius: 15px;
-    padding: 30px;
-    gap: 20px;
-    display: flex;
-    flex-direction: column;
+ width: 300px;
+ background-color: #7FC88D;
+ border-radius: 20px;
+ padding: 30px;
+ box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+ display: flex;
+ flex-direction: column;
+ gap: 20px;
 }
-
 .info-box {
-    background-color: #e4f2bc;
-    padding: 10px 15px;
-    font-size: 14px;
-    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+ background-color: #55965892;
+ padding: 15px 20px;
+ border-radius: 20px;
+ font-size: 15px;
+ box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+ transition: background-color 0.3s ease, color 0.3s ease;
 }
-
+.info-box:hover {
+ background-color: #6fbf73;
+ color: white;
+}
 .info-box-person {
-    display: flex;
-    flex-direction: row;
+ display: flex;
+ flex-direction: row;
+ gap: 10px;
+ align-items: center;
 }
-
-/* เขียนสำหรับ #map */
 #map {
-    flex: 1;         /* กินพื้นที่ที่เหลือใน container */
-    min-height: 600px; /* กำหนดความสูงขั้นต่ำ */
-    border-radius: 15px;
-    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+ flex: 1;
+ min-height: 600px;
+ border-radius: 20px;
+ box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+ background-color: white;
 }
-
-    .selectors {
-     .checkbox-group{
-      display: flex;
-      flex-direction: column;
-     }
-
-    }
-    .legend {
-      background: white;
-      padding: 6px 10px;
-      line-height: 1.5;
-      font-size: 14px;
-    }
-
-    .legend i {
-      width: 18px;
-      height: 18px;
-      float: left;
-      margin-right: 8px;
-      opacity: 0.7;
-    }
+.selectors .checkbox-group {
+ display: flex;
+ flex-direction: column;
+ gap: 10px;
+}
+.legend {
+ background: white;
+ padding: 10px 15px;
+ line-height: 1.5;
+ font-size: 14px;
+ border-radius: 10px;
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.legend i {
+ width: 18px;
+ height: 18px;
+ float: left;
+ margin-right: 8px;
+ opacity: 0.7;
+ border-radius: 3px;
+}
+/* ✅ ปุ่มเมนู: แผนที่ กราฟ ข้อมูล */
+.sidebar-button {
+ background-color: #ffffff;
+ color: #2e7d32;
+ border: 2px solid #2e7d32;
+ border-radius: 50px;
+ padding: 12px 25px;
+ font-weight: 600;
+ cursor: pointer;
+ transition: all 0.3s ease-in-out;
+ width: 100%;
+ font-size: 16px;
+ margin-bottom: 10px;
+ box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+.sidebar-button {
+ background-color: white; /* เอาพื้นหลังขาวออก */
+ color: #2e7d32; /* สีตัวอักษร */
+ border: 2px solid #2e7d32; /* เส้นขอบสีเขียว */
+ border-radius: 30px; /* โค้งมน */
+ padding: 6px 14px; /* ย่อขนาดภายใน */
+ font-weight: 500;
+ cursor: pointer;
+ transition: all 0.3s ease-in-out;
+ width: 100%; /* เต็มกล่อง */
+ font-size: 13px; /* ย่อขนาดฟอนต์ */
+ margin-bottom: 6px;
+}
+.sidebar-button:hover {
+ background-color: #2e7d32;
+ color: white;
+}

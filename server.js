@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-
+const session = require('express-session');
 
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -26,6 +26,13 @@ con.connect(function (err) {
   }
   console.log("Connect to My sql")
 });
+
+app.use(session({
+  secret: 'my_super_secret_key',  // เปลี่ยนเป็น ENV จริงจัง
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false }       // ถ้าใช้ HTTPS ให้เป็น true
+}));
 
 
 //index
@@ -50,35 +57,51 @@ app.get('/upload', (req, res) => {
 }); */
 //login
 app.post('/login', function (req, res) {
-  const { username, password } = req.body
-  const sql = 'SELECT * FROM LOGIN WHERE username =?';
+  const { username, password } = req.body;
+  const sql = 'SELECT * FROM LOGIN WHERE username = ?';
+
   con.query(sql, [username], function (err, result) {
     if (err) {
-      console.error('Error qureying database:', err);
-      res.status(500).json({ error: 'Error querying database' })
-    } else {
-      if (result.length === 0) {
-        res.status(401).json({ error: "Invalid username or password" });
-      } else {
-        const user = result[0]
-        bcrypt.compare(password, user.password, function (err, isMatch) {
-          if (err) {
-            console.error('Error comparing password:', err);
-            res.status(500).json({ error: 'Error comparing passwords' });
-          } else {
-            if (isMatch) {
-              res.status(200).json({ message: 'Login successful' });
-            } else {
-              ;
-              res.status(401).json({ error: 'Invalid username or password' });
-            }
-          }
-
-        })
-      }
+      console.error('Error querying database:', err);
+      return res.status(500).json({ error: 'Error querying database' });
     }
-  })
-})
+
+    if (result.length === 0) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const user = result[0];
+    bcrypt.compare(password, user.password, function (err, isMatch) {
+      if (err) {
+        console.error('Error comparing password:', err);
+        return res.status(500).json({ error: 'Error comparing passwords' });
+      }
+
+      if (isMatch) {
+        // ⭐ เก็บ user ไว้ใน session
+        req.session.user = {
+          id: user.id,
+          username: user.username
+        };
+        res.status(200).json({ message: 'Login successful' });
+      } else {
+        res.status(401).json({ error: 'Invalid username or password' });
+      }
+    });
+  });
+});
+app.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid'); // ลบ cookie ด้วย
+    res.status(200).json({ message: 'Logout successful' });
+  });
+});
+
+
+
 // register
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
@@ -99,23 +122,23 @@ app.post('/register', (req, res) => {
     });
   });
 });
+function requireLogin(req, res, next) {
+  if (req.session && req.session.user) {
+    return next(); // ผ่าน
+  } else {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+
 //-------------------map--------------------------------------------------------------
-app.post('/map-data', (req, res) => {
-  
+app.post('/map-data', requireLogin, (req, res) => {
   const {
-    year,
-    month,
-    date,
-    district_id,
-    incomeLevels,
-    ageGroups,
-    genders,
-    seasons,
-    district,
-    subdistrict
+    year, month, date,
+    district_id, incomeLevels,
+    ageGroups, genders, seasons,
+    district, subdistrict
   } = req.body;
 
-  
   const conditions = [];
   const values = [];
 
@@ -124,25 +147,26 @@ app.post('/map-data', (req, res) => {
     values.push(district_id);
   }
 
-  if (incomeLevels && incomeLevels.length > 0) {
+  if (incomeLevels?.length) {
     conditions.push(`p.monthly_income IN (${incomeLevels.map(() => '?').join(',')})`);
     values.push(...incomeLevels);
   }
 
-  if (ageGroups && ageGroups.length > 0) {
+  if (ageGroups?.length) {
     conditions.push(`p.age_range IN (${ageGroups.map(() => '?').join(',')})`);
     values.push(...ageGroups);
   }
 
-  if (genders && genders.length > 0) {
+  if (genders?.length) {
     conditions.push(`p.gender IN (${genders.map(() => '?').join(',')})`);
     values.push(...genders);
   }
 
-  if (seasons && seasons.length > 0) {
+  if (seasons?.length) {
     conditions.push(`p.season IN (${seasons.map(() => '?').join(',')})`);
     values.push(...seasons);
   }
+
   if (year) {
     conditions.push(`YEAR(p.birth_date) = ?`);
     values.push(year);
@@ -157,6 +181,7 @@ app.post('/map-data', (req, res) => {
     conditions.push(`DAY(p.birth_date) = ?`);
     values.push(date);
   }
+
   if (district && district !== 'none' && district !== 'อำเภอ') {
     conditions.push('d.name_th = ?');
     values.push(district);
@@ -167,77 +192,58 @@ app.post('/map-data', (req, res) => {
     values.push(subdistrict);
   }
 
-
-  const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '';
+  const whereClause = conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : '';
 
   const sql = `
-  SELECT 
-    d.name_th AS district_name,
-    SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
-    SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
-    SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
-  FROM person p
-  JOIN district d ON p.district_id = d.id
-  JOIN sub_district s ON p.subdistrict_id = s.id
-  WHERE p.predict IS NOT NULL
-  ${whereClause ? 'AND ' + whereClause : ''}
-  GROUP BY p.district_id;
-`;
-
+    SELECT 
+      d.name_th AS district_name,
+      SUM(CASE WHEN p.predict = 2 THEN 1 ELSE 0 END) AS count_low,
+      SUM(CASE WHEN p.predict = 1 THEN 1 ELSE 0 END) AS count_medium,
+      SUM(CASE WHEN p.predict = 0 THEN 1 ELSE 0 END) AS count_high
+    FROM person p
+    JOIN district d ON p.district_id = d.id
+    JOIN sub_district s ON p.subdistrict_id = s.id
+    WHERE p.predict IS NOT NULL
+    ${whereClause}
+    GROUP BY p.district_id
+  `;
 
   con.query(sql, values, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const riskByDistrict = {};
     const districtStats = {};
-    let total_high = 0;
-    let total_medium = 0;
-    let total_low = 0;
+    let total_high = 0, total_medium = 0, total_low = 0;
 
-    // 👉 แปลงผล SQL -> riskByDistrict
     rows.forEach(row => {
       const districtName = row.district_name.trim();
-      const low = Number(row.count_low);
-      const medium = Number(row.count_medium);
-      const high = Number(row.count_high);
+      const low = +row.count_low;
+      const medium = +row.count_medium;
+      const high = +row.count_high;
       districtStats[districtName] = { low, medium, high };
       total_low += low;
       total_medium += medium;
       total_high += high;
 
       const max = Math.max(low, medium, high);
-
       let risk = 'ไม่ระบุ';
-
       if (max === high) risk = 'เฝ้าระวังสูง';
       else if (max === medium) risk = 'เฝ้าระวังกลาง';
       else if (max === low) risk = 'เฝ้าระวังต่ำ';
+
       riskByDistrict[districtName] = risk;
-      // trim() เผื่อช่องว่าง
     });
 
-
-
-    console.log('SQL result rows:', rows);
-    console.log("SQL query:", sql);
-    console.log("SQL values:", values);
-
-    // ✅ โหลด geojson
     const geojsonPath = path.join(__dirname, 'data/chiangrai_districts.geojson');
     fs.readFile(geojsonPath, 'utf8', (geoErr, geoData) => {
       if (geoErr) return res.status(500).json({ error: geoErr.message });
 
       const geojson = JSON.parse(geoData);
-
-      // 👉 วน geojson.features แล้วเติม "ไม่ระบุ" ถ้ายังไม่มี
-      geojson.features.forEach(feature => {
-        const districtName = feature.properties.amp_th.trim();
-        if (!riskByDistrict[districtName]) {
-          riskByDistrict[districtName] = 'ไม่ระบุ';
-        }
+      geojson.features.forEach(f => {
+        const dName = f.properties.amp_th.trim();
+        if (!riskByDistrict[dName]) riskByDistrict[dName] = 'ไม่ระบุ';
       });
 
-      // ✅ ส่ง response
       res.json({
         geojson,
         riskByDistrict,
@@ -251,6 +257,7 @@ app.post('/map-data', (req, res) => {
     });
   });
 });
+
 
 //--------------------------------------subdistrict-------------
 app.post('/subdistrict-map-data', (req, res) => {

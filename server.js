@@ -41,6 +41,10 @@ app.get("/chart", function (req, res) {
 app.get("/table", function (req, res) {
   res.sendFile(path.join(__dirname, "view/table.html"));
 });
+app.get('/upload', (req, res) => {
+  res.sendFile(path.join(__dirname, 'view', 'upload.html'));
+});
+
 /* app.get('/chiangrai', (req, res) => {
   res.sendFile(path.join(__dirname, "data/chiangrai_districts.geojson"));
 }); */
@@ -716,9 +720,6 @@ const { spawn } = require('child_process');
 const upload = multer({ dest: 'uploads/' }); // เก็บไฟล์ชั่วคราว
 
 // Serve upload page
-app.get('/upload', (req, res) => {
-  res.sendFile(path.join(__dirname, 'view', 'upload.html'));
-});
 
 app.post('/upload', upload.single('csvFile'), (req, res) => {
   const filePath = req.file.path;

@@ -10,7 +10,7 @@
 <body>
     <header>
         <div class="top-buttons">
-            <button class="top-buttons-information">จัดการข้อมูล</button>
+             <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
             <button class="top-buttons-information">ออก</button>
         </div>
     </header>
@@ -90,9 +90,10 @@
                     </div>
                 </div>
             </form>
-            <button id="graph-button">กราฟ</button>
-            <button id="map-button">แผนที่</button>
-            <button id="table-button">ข้อมูล</button>
+           <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
+            <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
+            <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+  
         </div>
 
         <div id="map-container" style="display: none;">
@@ -324,8 +325,8 @@
                     row.insertCell().textContent = risk.low;
                 }
 
-                document.getElementById('summary').innerText =
-                    `ความเสี่ยงต่ำ: ${data.total.low}\nความเสี่ยงปานกลาง: ${data.total.medium}\nความเสี่ยงสูง: ${data.total.high}`;
+                    document.getElementById('summary').innerText =
+                    `เฝ้าระวังต่ำ: ${data.total.low}\nเฝ้าระวังปานกลาง ${data.total.medium}\nเฝ้าระวังสูง: ${data.total.high}`;
                 document.getElementById('total-events').innerText =
                     data.total.low + data.total.medium + data.total.high;
 
@@ -382,8 +383,7 @@
         });
 
         // Button event listeners for showing map/table
-        document.getElementById('map-button').addEventListener('click', showMap);
-        document.getElementById('table-button').addEventListener('click', showTable);
+
 
         // Initial load
         window.onload = async () => {

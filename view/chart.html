@@ -12,8 +12,9 @@
 <body>
     <header>
         <div class="top-buttons">
-            <button class="top-buttons-information">จัดการข้อมูล</button>
+            <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
             <button class="top-buttons-information">ออก</button>
+
         </div>
     </header>
 
@@ -37,17 +38,17 @@
                     <option value="">เดือน</option>
                 </select>
 
-                 <label for="day" class="all-label">วัน</label>
+                <label for="day" class="all-label">วัน</label>
                 <select id="day" name="selectedDay">
                     <option value="">วัน</option>
                 </select>
 
-                 <label for="district" class="all-label">อำเภอ</label>
+                <label for="district" class="all-label">อำเภอ</label>
                 <select id="district" name="district_id">
                     <option value="">อำเภอ</option>
                 </select>
 
-                 <label for="subdistrict" class="all-label">ตำบล</label>
+                <label for="subdistrict" class="all-label">ตำบล</label>
                 <select id="subdistrict" name="subdistrict_id">
                     <option value="">ตำบล</option>
                 </select>
@@ -95,9 +96,10 @@
                 </div>
             </form>
 
-            <button>แผนที่</button>
-            <button>กราฟ</button>
-            <button>ข้อมูล</button>
+   <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
+            <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
+            <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+  
         </div>
 
         <canvas id="riskChart" width="600" height="400"></canvas>
@@ -357,7 +359,7 @@
                 });
 
                 document.getElementById('summary').innerText =
-                    `ความเสี่ยงต่ำ: ${data.total.low}\nความเสี่ยงปานกลาง: ${data.total.medium}\nความเสี่ยงสูง: ${data.total.high}`;
+                    `เฝ้าระวังต่ำ: ${data.total.low}\nเฝ้าระวังปานกลาง ${data.total.medium}\nเฝ้าระวังสูง: ${data.total.high}`;
                 document.getElementById('total-events').innerText =
                     data.total.low + data.total.medium + data.total.high;
 

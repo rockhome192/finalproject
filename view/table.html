@@ -11,7 +11,7 @@
     <header>
         <div class="top-buttons">
              <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
-            <button class="top-buttons-information">ออก</button>
+            <button class="top-buttons-information" onclick="logout()">ออก</button>
         </div>
     </header>
 
@@ -392,6 +392,18 @@
             await updateAllDateDropdownsAndChart();
             showTable(); // Default to showing the table on load
         };
+            async function logout() {
+                const res = await fetch('/logout', { method: 'POST' });
+                if (res.ok) {
+                    window.location.href = '/login';
+                }
+            }
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted || window.performance.navigation.type === 2) {
+                    // ถ้ากลับมาจาก cache
+                    window.location.reload();
+                }
+            });
     </script>
 </body>
 </html>

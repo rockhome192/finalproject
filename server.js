@@ -8,6 +8,7 @@ const fs = require('fs');
 const session = require('express-session');
 
 
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -26,12 +27,20 @@ con.connect(function (err) {
   }
   console.log("Connect to My sql")
 });
+app.use(cors({
+  origin: 'http://localhost:3000', // เปลี่ยนให้ตรงกับ frontend ของคุณ
+  credentials: true               // ⭐ เปิดให้ส่ง cookie ได้
+}));
 
 app.use(session({
   secret: 'my_super_secret_key',  // เปลี่ยนเป็น ENV จริงจัง
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }       // ถ้าใช้ HTTPS ให้เป็น true
+   cookie: {
+    httpOnly: true,
+    secure: false, // ถ้าเป็น https ต้อง true
+    maxAge: 1000 * 60 * 60 // ตัวอย่าง: 1 ชั่วโมง
+  }
 }));
 
 
@@ -124,12 +133,20 @@ app.post('/register', (req, res) => {
 });
 function requireLogin(req, res, next) {
   if (req.session && req.session.user) {
-    return next(); // ผ่าน
+    next(); // ผ่าน
   } else {
-    return res.status(401).json({ error: 'Unauthorized' });
+    // ไม่ผ่าน ให้ redirect ไปหน้า login
+    res.redirect('/login');
   }
 }
-
+app.get('/check-session', (req, res) => {
+  console.log('Current session:', req.session);
+  if (req.session.user) {
+    res.json({ loggedIn: true, user: req.session.user });
+  } else {
+    res.json({ loggedIn: false });
+  }
+});
 //-------------------map--------------------------------------------------------------
 app.post('/map-data', requireLogin, (req, res) => {
   const {
@@ -589,7 +606,7 @@ app.get('/days-with-data', (req, res) => {
 });
 
 // POST /chart-data to receive filters from client and return aggregated data
-app.post('/chart-data', (req, res) => {
+app.post('/chart-data', requireLogin, (req, res) => {
     const {
         district_id,
         subdistrict_id,

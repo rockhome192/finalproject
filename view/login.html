@@ -27,17 +27,16 @@
 
 <script>
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
-  e.preventDefault(); // Prevent form from reloading the page
+  e.preventDefault();
 
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
   try {
-    const response = await fetch('http://localhost:3000/login', {  // Adjust port if needed
+    const response = await fetch('http://localhost:3000/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
       body: JSON.stringify({ username, password })
     });
 
@@ -45,9 +44,18 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
     if (response.ok) {
       alert(data.message);
-       window.location.href = '/index'
+
+      // หลัง login สำเร็จ ตรวจสอบ session
+      const sessionResponse = await fetch('http://localhost:3000/check-session', {
+        credentials: 'include'
+      });
+      const sessionData = await sessionResponse.json();
+      console.log('Login status:', sessionData.loggedIn);
+
+      // ไปหน้า index
+      window.location.href = '/index';
     } else {
-      alert(data.error); // Show error
+      alert(data.error);
     }
 
   } catch (error) {

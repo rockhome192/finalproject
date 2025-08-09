@@ -1,70 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link rel="stylesheet" href="/css/login.css">
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login • Chiang Rai Surveillance</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/login.css" />
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 </head>
+
 <body>
-  <div class="wrapper">
-    <form id="loginForm" >
+  <form id="loginForm" novalidate>
+    <div class="container">
+      <div class="side-image" role="img" aria-label="Chiang Rai map and charts"></div>
+
+      <div class="form-container">
+        <div class="brand">
+          <i class='bx bx-map-pin'></i>
+          <div>
+            <p class="title">Chiang Rai Surveillance</p>
+            <p class="subtitle">ระบบเฝ้าระวังความเสี่ยงการฆ่าตัวตายในจังหวัดเชียงราย</p>
+          </div>
+        </div>
+
         <h1>Login</h1>
 
-        <div class = "input-box">
-            <input type="text" id="username" placeholder="Username" class ="input-iconuser" required  > 
-              <i class='bx bxs-user'></i> 
+        <div class="input-box">
+          <input type="text" id="username" placeholder="Username" autocomplete="username" required
+            aria-label="Username">
+          <i class='bx bxs-user static-icon'></i>
         </div>
-        <div class = "input-box">
-            <input type="password" id="password" placeholder="Password"class ="input-iconpass" required>
-            <i class='bx bxs-lock-alt'></i> 
+
+        <div class="input-box">
+          <input type="password" id="password" placeholder="Password" autocomplete="current-password" required
+            aria-label="Password">
+          <i class='bx bxs-lock-alt static-icon'></i>
+          <button type="button" class="toggle-password" aria-label="Show/Hide password" aria-pressed="false">
+            <i class='bx bx-show'></i>
+          </button>
         </div>
-        <button type="submit" class="btn">Login</button>
-    </form>
-  </div>
+        
+        <div id="errorBox" class="error" aria-live="polite"></div>
 
+        <button type="submit" id="loginBtn" class="btn">
+          <span class="text">Login</span>
+          <span class="loading">กำลังเข้าสู่ระบบ…</span>
+        </button>
 
-<script>
-document.getElementById('loginForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
+      </div>
+    </div>
+  </form>
 
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-
-  try {
-    const response = await fetch('http://localhost:3000/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
-      body: JSON.stringify({ username, password })
+  <script>
+    // Toggle password
+    const pwd = document.getElementById('password');
+    const toggleBtn = document.querySelector('.toggle-password');
+    const toggleIcon = toggleBtn.querySelector('i');
+    function togglePassword() {
+      const show = pwd.type === 'password';
+      pwd.type = show ? 'text' : 'password';
+      toggleIcon.classList.toggle('bx-show', !show);
+      toggleIcon.classList.toggle('bx-hide', show);
+      toggleBtn.setAttribute('aria-pressed', String(show));
+      pwd.focus();
+    }
+    toggleBtn.addEventListener('click', togglePassword);
+    toggleBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePassword(); }
     });
 
-    const data = await response.json();
+    // Submit login
+    const form = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const errorBox = document.getElementById('errorBox');
 
-    if (response.ok) {
-      alert(data.message);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.classList.remove('show');
+      errorBox.textContent = '';
 
-      // หลัง login สำเร็จ ตรวจสอบ session
-      const sessionResponse = await fetch('http://localhost:3000/check-session', {
-        credentials: 'include'
-      });
-      const sessionData = await sessionResponse.json();
-      console.log('Login status:', sessionData.loggedIn);
+      const username = document.getElementById('username').value.trim();
+      const password = pwd.value;
 
-      // ไปหน้า index
-      window.location.href = '/index';
-    } else {
-      alert(data.error);
-    }
+      if (!username || !password) {
+        errorBox.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+        errorBox.classList.add('show');
+        return;
+      }
 
-  } catch (error) {
-    console.error('Login failed:', error);
-    alert('Something went wrong.');
-  }
-});
-</script>
+      loginBtn.classList.add('loading');
+      loginBtn.disabled = true;
 
+      try {
+        // เรียกโดเมนเดียวกัน + ส่งคุกกี้
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'เข้าสู่ระบบไม่สำเร็จ');
+        }
+
+        // ตรวจสอบ session ว่าล็อกอินแล้วจริง
+        const sRes = await fetch('/check-session', { credentials: 'include' });
+        const sData = await sRes.json().catch(() => ({}));
+
+        if (sRes.ok && sData?.loggedIn) {
+          // ไปหน้า index (ให้เซิร์ฟเวอร์มี route /index เสิร์ฟหน้าแผนที่/กราฟ)
+          window.location.href = '/index';
+        } else {
+          throw new Error('ไม่พบเซสชัน กรุณาลองใหม่');
+        }
+      } catch (err) {
+        console.error(err);
+        errorBox.textContent = err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+        errorBox.classList.add('show');
+      } finally {
+        loginBtn.classList.remove('loading');
+        loginBtn.disabled = false;
+      }
+    });
+  </script>
 </body>
 
 </html>

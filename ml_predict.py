@@ -114,8 +114,8 @@ try:
     
     
     # predict_counts = df['predict'].value_counts().to_dict()
-   # print(json.dumps({"predict_counts": predict_counts}, ensure_ascii=False))
-    print(json.dumps(result, ensure_ascii=False, indent=2))  # preview 3 records
+    # print(json.dumps({"predict_counts": predict_counts}, ensure_ascii=False))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 except Exception as e:
     print(json.dumps({"error": str(e)}))

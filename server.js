@@ -76,7 +76,7 @@ app.post('/login', function (req, res) {
     }
 
     if (result.length === 0) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      return res.status(401).json({ error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
     }
 
     const user = result[0];
@@ -93,7 +93,7 @@ app.post('/login', function (req, res) {
         };
         res.status(200).json({ message: 'Login successful' });
       } else {
-        res.status(401).json({ error: 'Invalid username or password' });
+        res.status(401).json({ error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
       }
     });
   });

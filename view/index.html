@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>map</title>
     <link rel="stylesheet" href="/css/index.css">
+    <link rel="stylesheet" href="/css/sidebar.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.js"></script>
@@ -13,9 +14,12 @@
 
 <body>
     <header>
+        <h1 class="ceiheader">
+            Chiangrai Suicide Risk Data
+        </h1>
         <div class="top-buttons">
             <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
-            <button class="top-buttons-information" onclick="logout()">ออก</button>
+            <button class="top-buttons-information logout" onclick="logout()">Logout</button>
         </div>
     </header>
 
@@ -29,9 +33,8 @@
                 <div class="info-box-person">
                     <p id="summary">กำลังโหลดข้อมูล...</p>
                     <h3>จำนวนเหตุ<br><strong id="total-events">-</strong></h3>
-                    <div id="detail-summary"></div>
-                    </p>
                 </div>
+                <div id="detail-summary"></div>
             </div>
 
 
@@ -67,12 +70,12 @@
                     <b>รายได้</b>
                     <div class="checkbox-group">
                         <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
-                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
                         <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
                         <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
                         <label><input type="checkbox" name="income"
-                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนข้างสูง</label>
-                        <!--  <label><input type="checkbox" name="income" value="รายได้สูง" />สูง</label> -->
+                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้สูง" />สูง</label>
                         <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
                     </div>
                 </div>
@@ -105,10 +108,20 @@
                 </div>
 
             </form>
+            <div class="button-container">
+                <div>
+                    <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
+                </div>
+                <div>
+                    <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
+                </div>
+                <div>
+                    <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+                </div>
+            </div>
 
-            <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
-            <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
-            <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+
+
 
         </div>
 
@@ -257,7 +270,10 @@
                 try {
                     const res = await fetch('http://localhost:3000/api/options/district');
                     const districts = await res.json();
+
                     const select = document.getElementById('district');
+                    const oldValue = select.value; // จำค่าเดิม
+
                     select.innerHTML = '<option value="none">อำเภอ</option>';
 
                     districts.forEach(name => {
@@ -267,15 +283,20 @@
                         select.appendChild(option);
                     });
 
-                    // ✅ ปิด dropdown ตำบลตอนแรก
-                    document.getElementById('subdistrict').disabled = true;
-
+                    if (oldValue && districts.includes(oldValue)) {
+                        select.value = oldValue;
+                        document.getElementById('subdistrict').disabled = false;
+                    } else {
+                        select.value = 'none';
+                        const sub = document.getElementById('subdistrict');
+                        sub.innerHTML = '<option value="none">ตำบล</option>';
+                        sub.disabled = true;
+                    }
                 } catch (err) {
                     console.error('โหลดอำเภอไม่สำเร็จ:', err);
                 }
             }
 
-            document.getElementById('subdistrict').disabled = true;
 
             // โหลดตำบล เมื่อเลือกอำเภอ
             document.getElementById('district').addEventListener('change', async (e) => {
@@ -636,7 +657,7 @@
 
                 }).addTo(map);
                 // Update sidebar summary
-                document.getElementById('summary').innerText = `เฝ้าระวังต่ำ ${data.total.low}\nเฝ้าระวังปานกลาง ${data.total.medium}\nเฝ้าระวังสูง ${data.total.high}`;
+                document.getElementById('summary').innerText = `เฝ้าระวังต่ำ : ${data.total.low}\nเฝ้าระวังปานกลาง : ${data.total.medium}\nเฝ้าระวังสูง : ${data.total.high}`;
                 document.getElementById('total-events').innerText =
                     data.total.low + data.total.medium + data.total.high;
             }

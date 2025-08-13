@@ -1,85 +1,95 @@
-  body {
-    margin: 0;
-    font-family: "Sarabun", sans-serif;
-    background-color: #8bb57b;
-    /* สีพื้นหลังเขียว */
-  }
-
-  header {
-    text-align: right;
-    margin: 10px;
-
-    .top-buttons-information {
-      color: black;
-      border: none;
-      outline: none;
-      border-radius: 40px;
-      width: 100px;
-      height: 40px;
-      
-    }
-
-  }
-
-  .container {
-    max-width: 1100px;
-    margin: 20px auto;
-    padding: 10px;
-    background-color: #8bb57b;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    justify-content: center;
+/* Ensure the html and body take up the full viewport */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: "Sarabun", sans-serif;
+  background-color: white;
+  overflow: hidden; /* Prevent scrolling for the entire page */
+  margin-bottom: 10px;
 }
 
-.sidebar {
-    width: 300px;
-    background-color: #c5e2a1;
-    border-radius: 15px;
-    padding: 30px;
-    gap: 20px;
-    display: flex;
-    flex-direction: column;
+header {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: #8bb57b;
 }
 
-.info-box {
-    background-color: #e4f2bc;
-    padding: 10px 15px;
-    font-size: 14px;
-    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+.top-buttons {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
 }
 
-.info-box-person {
-    display: flex;
-    flex-direction: row;
+.top-buttons-information {
+  color: black;
+  border: none;
+  outline: none;
+  border-radius: 40px;
+  width: 100px;
+  height: 40px;
+  background-color: white;
+  border: 1px solid #2c5530;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-/* เขียนสำหรับ #map */
+/* Hover/active effects for header action buttons (จัดการข้อมูล, Logout) */
+.top-buttons-information:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+}
+
+.top-buttons-information:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+/* Special hover for logout */
+.top-buttons-information.logout:hover {
+  background-color: #ff6b6b;
+  color: #ffffff;
+  border-color: #ff6b6b;
+}
+
+.container {
+  height: calc(100% - 60px); /* Adjust height to account for the header */
+  display: flex;
+  flex-wrap: nowrap; /* Prevent wrapping */
+  gap: 20px;
+  padding: 12px;
+  box-sizing: border-box; /* Include padding in height calculation */
+  padding-bottom: 18px;
+  padding-top: 10px;
+
+}
+
 #map {
-    flex: 1;         /* กินพื้นที่ที่เหลือใน container */
-    min-height: 600px; /* กำหนดความสูงขั้นต่ำ */
-    border-radius: 15px;
-    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+  flex: 1; /* Map takes up the remaining space */
+  border-radius: 15px;
+  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
 }
 
-    .selectors {
-     .checkbox-group{
-      display: flex;
-      flex-direction: column;
-     }
+.legend {
+  background: white;
+  padding: 6px 10px;
+  line-height: 1.5;
+  font-size: 14px;
+}
 
-    }
-    .legend {
-      background: white;
-      padding: 6px 10px;
-      line-height: 1.5;
-      font-size: 14px;
-    }
+.legend i {
+  width: 18px;
+  height: 18px;
+  float: left;
+  margin-right: 8px;
+  opacity: 0.7;
+}
 
-    .legend i {
-      width: 18px;
-      height: 18px;
-      float: left;
-      margin-right: 8px;
-      opacity: 0.7;
-    }
+/* Sticky button container at the bottom */
+.ceiheader{
+  display: inline-block;
+  font-size: 40px;
+  color: white;
+  padding: 0px;
+  margin: 0px;
+}

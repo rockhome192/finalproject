@@ -420,7 +420,7 @@ app.get('/api/options/year', (req, res) => {
   if (conditions.length) {
     sql += ' AND ' + conditions.join(' AND ');
   }
-  sql += ` ORDER BY year ASC`;
+  sql += ` ORDER BY year DESC`;
 
   con.query(sql, values, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });

@@ -7,14 +7,27 @@
     <title>Risk Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/css/index.css">
+    <link rel="stylesheet" href="/css/sidebar.css">
+    <style>
+        #chart-container {
+            background-color: white;
+        }
+        
+        #riskChart {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
 </head>
 
 <body>
     <header>
+        <h1 class="ceiheader">
+            Chiangrai Suicide Risk Data
+        </h1>
         <div class="top-buttons">
             <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
-            <button class="top-buttons-information" onclick="logout()">ออก</button>
-
+            <button class="top-buttons-information logout" onclick="logout()">Logout</button>
         </div>
     </header>
 
@@ -58,11 +71,11 @@
                     <b>รายได้</b>
                     <div class="checkbox-group">
                         <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
                         <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
                         <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
-                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
-                        <label><input type="checkbox" name="income"
-                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้สูง" />สูง</label>
                         <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
                         <!-- <label><input type="checkbox" name="income" value="ไม่ระบุ" />ไม่ระบุ</label> -->
                     </div>
@@ -96,13 +109,17 @@
                 </div>
             </form>
 
-   <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
+   <div class="button-container">
+            <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
             <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
             <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+   </div>
   
         </div>
 
-        <canvas id="riskChart" width="600" height="400"></canvas>
+        <div id="chart-container" style="flex: 1; border-radius: 15px; box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1); background-color: white; padding: 20px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="riskChart" style="max-width: 100%; max-height: 100%;"></canvas>
+        </div>
     </div>
 
     <script>
@@ -333,7 +350,7 @@
                         ]
                     },
                     options: {
-                        responsive: false,
+                        responsive: true,
                         maintainAspectRatio: false,
                         scales: {
                             x: {},
@@ -359,7 +376,7 @@
                 });
 
                 document.getElementById('summary').innerText =
-                    `เฝ้าระวังต่ำ: ${data.total.low}\nเฝ้าระวังปานกลาง ${data.total.medium}\nเฝ้าระวังสูง: ${data.total.high}`;
+                    `เฝ้าระวังต่ำ : ${data.total.low}\nเฝ้าระวังปานกลาง : ${data.total.medium}\nเฝ้าระวังสูง : ${data.total.high}`;
                 document.getElementById('total-events').innerText =
                     data.total.low + data.total.medium + data.total.high;
 
@@ -420,19 +437,28 @@
             // Initial load of all date dropdowns
             await updateAllDateDropdownsAndChart(); // Call the master function for initial load
         };
-            async function logout() {
-                const res = await fetch('/logout', { method: 'POST' });
-                if (res.ok) {
-                    window.location.href = '/login';
-                }
+
+        async function logout() {
+            const res = await fetch('/logout', { method: 'POST' });
+            if (res.ok) {
+                window.location.href = '/login';
             }
-            window.addEventListener('pageshow', function (event) {
-                if (event.persisted || window.performance.navigation.type === 2) {
-                    // ถ้ากลับมาจาก cache
-                    window.location.reload();
-                }
-            });
+        }
+               async function logout() {
+            const res = await fetch('/logout', { method: 'POST' });
+            if (res.ok) {
+                window.location.href = '/login';
+            }
+        }
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || window.performance.navigation.type === 2) {
+                // ถ้ากลับมาจาก cache
+                window.location.reload();
+            }
+        });
     </script>
 </body>
+
+</html>
 
 </html>

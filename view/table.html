@@ -1,17 +1,24 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Risk Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/css/index.css">
+    <link rel="stylesheet" href="/css/sidebar.css">
     <link rel="stylesheet" href="/css/table.css">
 </head>
+
 <body>
     <header>
+        <h1 class="ceiheader">
+            Chiangrai Suicide Risk Data
+        </h1>
         <div class="top-buttons">
-             <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
-            <button class="top-buttons-information" onclick="logout()">ออก</button>
+            <button class="top-buttons-information" onclick="window.location.href='/upload'">จัดการข้อมูล</button>
+            <button class="top-buttons-information logout" onclick="logout()">Logout</button>
         </div>
     </header>
 
@@ -22,6 +29,7 @@
                     <p id="summary">กำลังโหลดข้อมูล...</p>
                     <h3>จำนวนเหตุ<br><strong id="total-events">-</strong></h3>
                 </div>
+                <div id="detail-summary"></div>
             </div>
 
             <form class="selectors" id="filterForm">
@@ -35,17 +43,17 @@
                     <option value="">เดือน</option>
                 </select>
 
-                 <label for="day" class="all-label">วัน</label>
+                <label for="day" class="all-label">วัน</label>
                 <select id="day" name="selectedDay">
                     <option value="">วัน</option>
                 </select>
 
-                 <label for="district" class="all-label">อำเภอ</label>
+                <label for="district" class="all-label">อำเภอ</label>
                 <select id="district" name="district_id">
                     <option value="">อำเภอ</option>
                 </select>
 
-                 <label for="subdistrict" class="all-label">ตำบล</label>
+                <label for="subdistrict" class="all-label">ตำบล</label>
                 <select id="subdistrict" name="subdistrict_id">
                     <option value="">ตำบล</option>
                 </select>
@@ -54,12 +62,13 @@
                     <b>รายได้</b>
                     <div class="checkbox-group">
                         <label><input type="checkbox" name="income" value="ไม่มีรายได้" />ไม่มีรายได้</label>
+                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
                         <label><input type="checkbox" name="income" value="รายได้น้อยมาก" />น้อยมาก</label>
                         <label><input type="checkbox" name="income" value="รายได้ปานกลาง" />ปานกลาง</label>
-                        <label><input type="checkbox" name="income" value="รายได้น้อย" />น้อย</label>
-                        <label><input type="checkbox" name="income" value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income"
+                                value="รายได้ปานกลางค่อนสูง" />ปานกลางค่อนสูง</label>
+                        <label><input type="checkbox" name="income" value="รายได้สูง" />สูง</label>
                         <label><input type="checkbox" name="income" value="รายได้สูงมาก" />สูงมาก</label>
-                        <label><input type="checkbox" name="income" value="ไม่ระบุ" />ไม่ระบุ</label>
                     </div>
                 </div>
 
@@ -90,17 +99,22 @@
                     </div>
                 </div>
             </form>
-           <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
-            <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
-            <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
-  
+            <div class="button-container">
+                <div>
+                    <button id="map-button" onclick="window.location.href='/index'">แผนที่</button>
+                </div>
+                <div>
+                    <button id="graph-button" onclick="window.location.href='/chart'">กราฟ</button>
+                </div>
+                <div>
+                    <button id="table-button" onclick="window.location.href='/table'">ตาราง</button>
+                </div>
+            </div>
+
         </div>
 
-        <div id="map-container" style="display: none;">
-            <p>Map content would be here if implemented.</p>
-        </div>
-
-        <div id="table-container" style="display: block; flex: 1; overflow-x: auto;">
+        <div id="table-container"
+            style="flex: 1; border-radius: 15px; box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1); background-color: white; padding: 20px; overflow: auto;">
             <table id="riskTable" class="risk-table">
                 <thead>
                     <tr>
@@ -111,11 +125,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    </tbody>
+                </tbody>
             </table>
         </div>
     </div>
-
     <script>
         // No longer need ctx or chart directly for table display, but keeping for reference if you revert
         // const ctx = document.getElementById('riskChart').getContext('2d');
@@ -325,8 +338,8 @@
                     row.insertCell().textContent = risk.low;
                 }
 
-                    document.getElementById('summary').innerText =
-                    `เฝ้าระวังต่ำ: ${data.total.low}\nเฝ้าระวังปานกลาง ${data.total.medium}\nเฝ้าระวังสูง: ${data.total.high}`;
+                document.getElementById('summary').innerText =
+                    `เฝ้าระวังต่ำ : ${data.total.low}\nเฝ้าระวังปานกลาง : ${data.total.medium}\nเฝ้าระวังสูง : ${data.total.high}`;
                 document.getElementById('total-events').innerText =
                     data.total.low + data.total.medium + data.total.high;
 
@@ -392,18 +405,19 @@
             await updateAllDateDropdownsAndChart();
             showTable(); // Default to showing the table on load
         };
-            async function logout() {
-                const res = await fetch('/logout', { method: 'POST' });
-                if (res.ok) {
-                    window.location.href = '/login';
-                }
+        async function logout() {
+            const res = await fetch('/logout', { method: 'POST' });
+            if (res.ok) {
+                window.location.href = '/login';
             }
-            window.addEventListener('pageshow', function (event) {
-                if (event.persisted || window.performance.navigation.type === 2) {
-                    // ถ้ากลับมาจาก cache
-                    window.location.reload();
-                }
-            });
+        }
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || window.performance.navigation.type === 2) {
+                // ถ้ากลับมาจาก cache
+                window.location.reload();
+            }
+        });
     </script>
 </body>
+
 </html>

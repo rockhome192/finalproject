@@ -11,17 +11,17 @@ def income_category(income):
     if income == 0:
         return "ไม่มีรายได้"
     elif income < 1000:
-        return "รายได้น้อยมาก"
+        return "น้อยมาก"
     elif income < 5000:
-        return "รายได้น้อย"
+        return "น้อย"
     elif income < 10000:
-        return "รายได้ปานกลาง"
+        return "ปานกลาง"
     elif income < 15000:
-        return "รายได้ปานกลางค่อนสูง"
+        return "ปานกลางค่อนสูง"
     elif income < 30000:
-        return "รายได้สูง"
+        return "สูง"
     else:
-        return "รายได้สูงมาก"
+        return "สูงมาก"
 
 def get_season(month):
     if month in [11, 12, 1]:

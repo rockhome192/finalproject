@@ -946,12 +946,30 @@ function normalize(str) {
         return `${gregorianYear}-${mm}-${dd}`;
       }
 
+const incomeMap = {
+        "ไม่มีรายได้": "ไม่มีรายได้",
+        "น้อยมาก": "รายได้น้อยมาก",
+        "น้อย": "รายได้น้อย",
+        "ปานกลาง": "รายได้ปานกลาง",
+        "ปานกลางค่อนสูง": "รายได้ปานกลางค่อนสูง",
+        "สูง": "รายได้สูง",
+        "สูงมาก": "รายได้สูงมาก",
+      };
+
+      function normalizeIncomeLabel(label) {
+        if (!label) return label;
+        if (label.includes("รายได้")) return label;  // ถ้าเดิมมี "รายได้" แล้วไม่ต้องทำอะไร
+        return incomeMap[label] ?? label;             // ถ้าเจอในแมปก็แปลง ถ้าไม่เจอคืนค่าเดิม
+      }
 
       results = results.map(row => ({
         id: row['ลำดับ'],
         gender: row['เพศ'],
         marital_status: row["สถานภาพสมรส"],
-        monthly_income: row["ระดับรายได้"],
+
+        // แปลงให้มีคำว่า "รายได้" ก่อนเก็บ DB
+        monthly_income: normalizeIncomeLabel(row["ระดับรายได้"]),
+
         season: row['ฤดูกาล'],
         age_range: row["ช่วงอายุ"],
         district_id: combine_district_from_string(row),
@@ -959,9 +977,7 @@ function normalize(str) {
         birth_date: combine_birth_date(row),
         province_id: 1,  // รหัสจังหวัดเชียงราย
         predict: row['predict'],
-
       }));
-      
       
 
       // อัปเดตฐานข้อมูลทีละแถว
